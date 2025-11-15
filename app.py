@@ -16,7 +16,6 @@ DB_NAME = "UniHub_Courses"
 
 
 class Document(beanie.Document):
-    # ... (Model của bạn giữ nguyên) ...
     filename: str = Field(..., index=True)
     saved_path: str
     content_type: str
@@ -34,7 +33,6 @@ class Document(beanie.Document):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ... (Lifespan của bạn giữ nguyên) ...
     print("Bắt đầu khởi động server...")
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
@@ -55,7 +53,6 @@ app = FastAPI(lifespan=lifespan)
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 @app.post("/uploadfile/")
 async def create_upload_file(
     file: UploadFile = File(...),
@@ -67,18 +64,29 @@ async def create_upload_file(
     documentType: str = Form(...),
     tags: str = Form(default="") 
 ):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+
+    
+    # create path
+    local_file_path = os.path.join(UPLOAD_DIR, file.filename)
+    
+    # save database 
+
+    db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
+
+    # save file to folder 
     try:
-        with open(file_path, "wb") as buffer:
+        with open(local_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        file_size = os.path.getsize(file_path)
+        file_size = os.path.getsize(local_file_path) 
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
         file.file.close()
+
+    # 4. Creat a object 
     doc = Document(
         filename=file.filename,
-        saved_path=file_path,
+        saved_path=db_save_path,  
         content_type=file.content_type,
         size_bytes=file_size,
         university = university,
@@ -89,19 +97,22 @@ async def create_upload_file(
         documentType = documentType,
         tags = tags 
     )
+
+    # 5. Add to MongoDB 
     try:
         await doc.insert()
+        
         return JSONResponse(content={
             "status": "uploaded successfully",
             "filename": doc.filename, 
             "mongo_id": str(doc.id) 
         })
+        
     except Exception as e:
         print(f"Error saving to MongoDB: {e}")
         return JSONResponse(status_code=500, content={
             "detail": f"File saved successfully but could not save to database: {e}"
         })
-
 
 
 # === 1. API To get all data ===
@@ -117,6 +128,7 @@ async def get_all_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 

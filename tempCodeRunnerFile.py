@@ -1,55 +1,7 @@
-# import os
-# import shutil
-# import uvicorn
-# from fastapi import FastAPI, File, UploadFile
-# from fastapi.staticfiles import StaticFiles
-# from fastapi.responses import JSONResponse, RedirectResponse
-
-# app = FastAPI()
-
-# # Thư mục để lưu file upload
-# UPLOAD_DIR = "uploads"
-# os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# # Form trong 'public/upload.html' sẽ gọi đến đường dẫn này
-# @app.post("/uploadfile/")
-# async def create_upload_file(file: UploadFile = File(...)):
-    
-#     # Tạo đường dẫn an toàn để lưu file
-#     file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-#     try:
-#         # Lưu file vào thư mục 'uploads'
-#         with open(file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-#     except Exception as e:
-#         # Nếu có lỗi, trả về JSON lỗi
-#         return JSONResponse(status_code=500, content={"detail": f"Do not save file: {e}"})
-#     finally:
-#         file.file.close() # Luôn đóng file sau khi xử lý
-
-#     # Trả về JSON thông báo thành công
-#     # (JavaScript trong upload.html sẽ nhận và hiển thị)
-#     return JSONResponse(content={
-#         "filename": file.filename, 
-#         "status": "has been uploaded successfully", 
-#         "saved_path": file_path
-#     })
-
-
-
-# app.mount("/", StaticFiles(directory="public", html=True), name="public")
-
-
-# if __name__ == "__main__":
-#     print(f"Server is running at http://127.0.0.1:8000")
-#     print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
-
 import os
 import shutil
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, Request
+from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -57,126 +9,178 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 import beanie
+from typing import List
+from beanie import PydanticObjectId 
 
-# ===================================================================
-# === CẤU HÌNH DATABASE (ĐÃ CẬP NHẬT) ===
-# ===================================================================
-
-# THAY ĐỔI 1: Đây là chuỗi kết nối tới server local của bạn
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
-
-# THAY ĐỔI 2: Đây là tên Database bạn đã tạo
 DB_NAME = "UniHub_Courses"
 
-# ===================================================================
-# === 1. ĐỊNH NGHĨA MODEL (SCHEMA) ===
-# ===================================================================
 
 class Document(beanie.Document):
-    # Model này định nghĩa cấu trúc dữ liệu cho file upload
     filename: str = Field(..., index=True)
     saved_path: str
     content_type: str
     size_bytes: int
     uploaded_at: datetime = Field(default_factory=datetime.now)
-
+    university : str
+    faculty : str
+    course : str
+    documentTitle : str
+    description : str
+    documentType : str
+    tags : str 
     class Settings:
-        # THAY ĐỔI 3: Đây là tên Collection bạn đã tạo
         name = "Courses"
-
-# ===================================================================
-# === 2. LIFESPAN: Khởi tạo Beanie ===
-# ===================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Bắt đầu khởi động server...")
-    
-    # 1. Khởi tạo MongoDB client (dùng chuỗi kết nối mới)
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
-    
-    # 2. Khởi tạo Beanie (dùng tên DB mới)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
-        document_models=[Document]  # Báo cho Beanie dùng model 'Document'
+        document_models=[Document] 
     )
-    
-    print(f"🎉 Kết nối Beanie và MongoDB thành công!")
+    print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
     print(f"   - Collection: {Document.Settings.name}")
-
     yield 
-
-    print("Bắt đầu tắt server...")
+    print("Starting to shut down the server...")
     app.mongodb_client.close()
-    print("Đã ngắt kết nối MongoDB.")
+    print("Disconnected from MongoDB.")
 
-
-# ===================================================================
-# === KHỞI TẠO APP FASTAPI ===
-# ===================================================================
 
 app = FastAPI(lifespan=lifespan)
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ===================================================================
-# === 3. API ENDPOINT (Giữ nguyên) ===
-# ===================================================================
 
+# @app.post("/uploadfile/")
+# async def create_upload_file(
+#     file: UploadFile = File(...),
+#     university: str = Form(...),
+#     faculty: str = Form(...),
+#     course: str = Form(...),
+#     documentTitle: str = Form(...),
+#     description: str = Form(...),
+#     documentType: str = Form(...),
+#     tags: str = Form(default="") 
+# ):
+#     file_path = os.path.join(UPLOAD_DIR, file.filename)
+#     try:
+#         with open(file_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+#         file_size = os.path.getsize(file_path)
+#     except Exception as e:
+#         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
+#     finally:
+#         file.file.close()
+#     doc = Document(
+#         filename=file.filename,
+#         saved_path=file_path,
+#         content_type=file.content_type,
+#         size_bytes=file_size,
+#         university = university,
+#         faculty = faculty,
+#         course = course,
+#         documentTitle = documentTitle,
+#         description = description,
+#         documentType = documentType,
+#         tags = tags 
+#     )
+#     try:
+#         await doc.insert()
+#         return JSONResponse(content={
+#             "status": "uploaded successfully",
+#             "filename": doc.filename, 
+#             "mongo_id": str(doc.id) 
+#         })
+#     except Exception as e:
+#         print(f"Error saving to MongoDB: {e}")
+#         return JSONResponse(status_code=500, content={
+#             "detail": f"File saved successfully but could not save to database: {e}"
+#         })
 @app.post("/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...)):
-    """
-    Lưu file vào thư mục 'uploads' VÀ
-    lưu thông tin vào Collection 'Courses' trong DB 'UniHub_Courses'.
-    """
+async def create_upload_file(
+    # ... (các tham số Form và File giữ nguyên) ...
+    file: UploadFile = File(...),
+    university: str = Form(...),
+    faculty: str = Form(...),
+    course: str = Form(...),
+    documentTitle: str = Form(...),
+    description: str = Form(...),
+    documentType: str = Form(...),
+    tags: str = Form(default="") 
+):
+
     
-    # 1. Lưu file vào thư mục
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    # 1. Tạo đường dẫn LƯU TRỮ CỤC BỘ (dùng \ trên Windows)
+    local_file_path = os.path.join(UPLOAD_DIR, file.filename)
+    
+    # 2. Tạo đường dẫn LƯU VÀO DATABASE (luôn dùng /)
+    # Chúng ta thay thế \ bằng /
+    db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
+
+    # 3. Save file to folder (dùng đường dẫn cục bộ)
     try:
-        with open(file_path, "wb") as buffer:
+        with open(local_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        file_size = os.path.getsize(file_path)
+        file_size = os.path.getsize(local_file_path) # Lấy size từ file cục bộ
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": f"Không thể lưu file: {e}"})
+        return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
         file.file.close()
 
-    # 2. Tạo một đối tượng Document (dùng Model)
+    # 4. Creat a object (dùng đường dẫn của database)
     doc = Document(
         filename=file.filename,
-        saved_path=file_path,
+        saved_path=db_save_path,  # <--- LỖI ĐƯỢC SỬA Ở ĐÂY
         content_type=file.content_type,
-        size_bytes=file_size
+        size_bytes=file_size,
+        university = university,
+        faculty = faculty,
+        course = course,
+        documentTitle = documentTitle,
+        description = description,
+        documentType = documentType,
+        tags = tags 
     )
 
-    # 3. Thêm vào MongoDB
+    # 5. Add to MongoDB (Giữ nguyên)
     try:
         await doc.insert()
         
         return JSONResponse(content={
-            "status": "đã upload thành công",
+            "status": "uploaded successfully",
             "filename": doc.filename, 
             "mongo_id": str(doc.id) 
         })
         
     except Exception as e:
-        print(f"Lỗi khi lưu vào MongoDB: {e}")
+        print(f"Error saving to MongoDB: {e}")
         return JSONResponse(status_code=500, content={
-            "detail": f"Lưu file thành công nhưng không thể lưu vào database: {e}"
+            "detail": f"File saved successfully but could not save to database: {e}"
         })
 
-# ===================================================================
-# === PHỤC VỤ FILE TĨNH (HTML, CSS, JS) ===
-# ===================================================================
+
+# === 1. API To get all data ===
+@app.get("/documents/", response_model=List[Document])
+async def get_all_documents():
+    """
+    Get ALL documents in the 'Courses' collection.
+    """
+    try:
+        courses = await Document.find_all().to_list()
+        return courses
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 
-# ===================================================================
-# === CHẠY SERVER ===
-# ===================================================================
 if __name__ == "__main__":
-    print(f"Server đang chạy tại http://127.0.0.1:8000")
-    print(f"File upload sẽ được lưu tại thư mục: {os.path.abspath(UPLOAD_DIR)}")
+    print(f"Server is running at http://127.0.0.1:8000")
+    print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
     uvicorn.run(app, host="127.0.0.1", port=8000)

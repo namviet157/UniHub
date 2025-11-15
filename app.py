@@ -29,7 +29,7 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # --- SQL Server Configuration (for Users) ---
-SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST", r"DESKTOP-CI5IA7D\SQLEXPRESS")
+SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST", r"localhost")
 SQL_SERVER_PORT = os.getenv("SQL_SERVER_PORT", "1433")
 SQL_SERVER_USER = os.getenv("SQL_SERVER_USER", "sa")
 SQL_SERVER_PASSWORD = os.getenv("SQL_SERVER_PASSWORD", "123456789")
@@ -59,6 +59,27 @@ class Document(beanie.Document):
     class Settings:
         name = "Courses"
 
+# --- Model for MongoDB (Comment) ---
+class Comment(beanie.Document):
+    document_id: str = Field(..., index=True)
+    author_id: str
+    author_name: str
+    text: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    class Settings:
+        name = "Comments"
+
+# --- Model for MongoDB (Vote) ---
+class Vote(beanie.Document):
+    document_id: str = Field(..., index=True)
+    user_id: str = Field(..., index=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    class Settings:
+        name = "Votes"
+        indexes = [
+            [("document_id", 1), ("user_id", 1)],  # Compound index to prevent duplicate votes
+        ]
+
 # --- Models for SQL Server (User) ---
 class UserRegister(BaseModel):
     fullname: str
@@ -76,6 +97,16 @@ class UserResponse(BaseModel):
     email: str
     university: str
     created_at: datetime
+
+class ProfileUpdate(BaseModel):
+    fullname: Optional[str] = None
+    university: Optional[str] = None
+    major: Optional[str] = None
+    bio: Optional[str] = None
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -162,23 +193,47 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT id, fullname, email, university, password, created_at FROM users WHERE email = ?",
-                (email,)
-            )
+            # Check if major column exists
+            try:
+                await cur.execute("""
+                    SELECT COUNT(*) FROM sys.columns 
+                    WHERE object_id = OBJECT_ID('users') AND name = 'major'
+                """)
+                major_exists = (await cur.fetchone())[0] > 0
+            except Exception:
+                major_exists = False
+            
+            # Select with or without major column
+            if major_exists:
+                await cur.execute(
+                    "SELECT id, fullname, email, university, password, created_at, major FROM users WHERE email = ?",
+                    (email,)
+                )
+            else:
+                await cur.execute(
+                    "SELECT id, fullname, email, university, password, created_at FROM users WHERE email = ?",
+                    (email,)
+                )
             row = await cur.fetchone()
     
     if row is None:
         raise credentials_exception
     
-    user = {
-        "id": row[0], "fullname": row[1], "email": row[2],
-        "university": row[3], "password": row[4], "created_at": row[5]
-    }
+    if major_exists and len(row) > 6:
+        user = {
+            "id": row[0], "fullname": row[1], "email": row[2],
+            "university": row[3], "password": row[4], "created_at": row[5], "major": row[6]
+        }
+    else:
+        user = {
+            "id": row[0], "fullname": row[1], "email": row[2],
+            "university": row[3], "password": row[4], "created_at": row[5], "major": None
+        }
     
     return {
         "_id": str(user["id"]), "fullname": user["fullname"], "email": user["email"],
-        "university": user["university"], "password": user["password"], "created_at": user["created_at"]
+        "university": user["university"], "password": user["password"], 
+        "created_at": user["created_at"], "major": user.get("major")
     }
 
 @asynccontextmanager
@@ -190,7 +245,7 @@ async def lifespan(app: FastAPI):
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
-        document_models=[Document] 
+        document_models=[Document, Comment, Vote] 
     )
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
@@ -296,7 +351,7 @@ async def create_upload_file(
             "detail": f"File saved successfully but could not save to database: {e}"
         })
 
-@app.get("/documents/", response_model=List[Document])
+@app.get("/documents/")  # Removed response_model to allow custom fields
 async def get_all_documents(
     university: Optional[str] = Query(None),
     faculty: Optional[str] = Query(None),
@@ -326,8 +381,70 @@ async def get_all_documents(
         else:
             # If no filters, get all
             courses = await Document.find_all().to_list()
+        
+        # 4. Convert to list of dictionaries and ensure id is included
+        result = []
+        for doc in courses:
+            # Get base dictionary from document
+            doc_dict = doc.dict()
+            # Ensure id is present as both 'id' and '_id' for compatibility
+            doc_id = str(doc.id)
             
-        return courses
+            # Get vote count and comment count for priority calculation
+            try:
+                vote_count = await Vote.find(Vote.document_id == doc_id).count()
+            except Exception as e:
+                print(f"Error counting votes for {doc_id}: {e}")
+                vote_count = 0
+            
+            try:
+                comment_count = await Comment.find(Comment.document_id == doc_id).count()
+            except Exception as e:
+                print(f"Error counting comments for {doc_id}: {e}")
+                comment_count = 0
+            
+            # Ensure these are integers
+            vote_count_int = int(vote_count) if vote_count else 0
+            comment_count_int = int(comment_count) if comment_count else 0
+            
+            # Ensure uploaded_at is serializable (convert datetime to ISO string if needed)
+            if 'uploaded_at' in doc_dict and isinstance(doc_dict['uploaded_at'], datetime):
+                doc_dict['uploaded_at'] = doc_dict['uploaded_at'].isoformat()
+            
+            # Create a new dictionary with all fields, ensuring vote_count and comment_count are included
+            final_dict = {
+                **doc_dict,  # Include all original document fields
+                'id': doc_id,
+                '_id': doc_id,
+                'vote_count': vote_count_int,
+                'comment_count': comment_count_int,
+                'priority_score': vote_count_int * 2 + comment_count_int,
+                'has_voted': False  # Default, will be updated if user is logged in
+            }
+        
+            
+            result.append(final_dict)
+        
+        # 5. Sort by priority score (highest first), then by upload date (newest first)
+        def get_sort_key(x):
+            priority = -x.get('priority_score', 0)
+            # Handle uploaded_at - could be datetime object or string
+            uploaded_at = x.get('uploaded_at')
+            if isinstance(uploaded_at, datetime):
+                date_score = -uploaded_at.timestamp()
+            elif isinstance(uploaded_at, str):
+                try:
+                    date_obj = datetime.fromisoformat(uploaded_at.replace('Z', '+00:00'))
+                    date_score = -date_obj.timestamp()
+                except:
+                    date_score = 0
+            else:
+                date_score = 0
+            return (priority, date_score)
+        
+        result.sort(key=get_sort_key)
+        
+        return result
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -449,18 +566,322 @@ async def login(credentials: UserLogin):
         user=user_response
     )
 
-@app.get("/api/me", response_model=UserResponse)
+@app.get("/api/me")
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    return UserResponse(
-        id=str(current_user["_id"]),
-        fullname=current_user["fullname"],
-        email=current_user["email"],
-        university=current_user["university"],
-        created_at=current_user["created_at"]
-    )
+    # Return user data including major if available
+    user_data = {
+        "id": str(current_user["_id"]),
+        "fullname": current_user["fullname"],
+        "email": current_user["email"],
+        "university": current_user["university"],
+        "created_at": current_user["created_at"]
+    }
+    if "major" in current_user and current_user["major"]:
+        user_data["major"] = current_user["major"]
+    
+    # Check if avatar file exists
+    avatar_dir = "public/data/avatars"
+    user_id = str(current_user["_id"])
+    # Try common image extensions
+    for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+        avatar_path = os.path.join(avatar_dir, f"{user_id}{ext}")
+        if os.path.exists(avatar_path):
+            user_data["avatar_url"] = f"/data/avatars/{user_id}{ext}"
+            break
+    
+    return user_data
+
+@app.put("/api/profile/update")
+async def update_profile(
+    current_user: dict = Depends(get_current_user),
+    fullname: Optional[str] = Form(None),
+    university: Optional[str] = Form(None),
+    major: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
+    avatar: Optional[UploadFile] = File(None)
+):
+    """Update user profile information"""
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+    
+    try:
+        update_fields = []
+        update_values = []
+        
+        if fullname:
+            update_fields.append("fullname = ?")
+            update_values.append(fullname)
+        
+        if university:
+            update_fields.append("university = ?")
+            update_values.append(university)
+        
+        # Try to update major if provided
+        if major:
+            update_fields.append("major = ?")
+            update_values.append(major)
+        
+        if not update_fields:
+            return JSONResponse(content={"message": "No fields to update"})
+        
+        update_values.append(current_user["email"])
+        
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                # Try to add major column if it doesn't exist and major is being updated
+                if major:
+                    try:
+                        await cur.execute("""
+                            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'major')
+                            BEGIN
+                                ALTER TABLE users ADD major NVARCHAR(255) NULL
+                            END
+                        """)
+                    except Exception:
+                        pass  # Column might already exist or error occurred
+                
+                query = f"UPDATE users SET {', '.join(update_fields)} WHERE email = ?"
+                await cur.execute(query, tuple(update_values))
+        
+        # Handle avatar upload if provided
+        avatar_url = None
+        if avatar:
+            avatar_dir = "public/data/avatars"
+            os.makedirs(avatar_dir, exist_ok=True)
+            file_extension = os.path.splitext(avatar.filename)[1] or '.jpg'
+            avatar_filename = f"{current_user['_id']}{file_extension}"
+            avatar_path = os.path.join(avatar_dir, avatar_filename)
+            
+            # Delete old avatar if exists (different extension)
+            user_id = str(current_user['_id'])
+            for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                old_avatar = os.path.join(avatar_dir, f"{user_id}{ext}")
+                if os.path.exists(old_avatar) and old_avatar != avatar_path:
+                    try:
+                        os.remove(old_avatar)
+                    except Exception:
+                        pass
+            
+            with open(avatar_path, "wb") as buffer:
+                shutil.copyfileobj(avatar.file, buffer)
+            
+            avatar_url = f"/data/avatars/{avatar_filename}"
+        
+        return JSONResponse(content={
+            "message": "Profile updated successfully",
+            "avatar_url": avatar_url
+        })
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating profile: {str(e)}"
+        )
+
+@app.post("/api/profile/change-password")
+async def change_password(
+    password_data: ChangePassword,
+    current_user: dict = Depends(get_current_user)
+):
+    """Change user password"""
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+    
+    try:
+        # Verify current password
+        if not verify_password(password_data.current_password, current_user["password"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect"
+            )
+        
+        # Hash new password
+        hashed_password = get_password_hash(password_data.new_password)
+        
+        # Update password in database
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE users SET password = ? WHERE email = ?",
+                    (hashed_password, current_user["email"])
+                )
+        
+        return JSONResponse(content={"message": "Password changed successfully"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error changing password: {str(e)}"
+        )
+
+# --- API for Comments ---
+
+@app.get("/api/documents/{document_id}/comments")
+async def get_comments(document_id: str):
+    """Get all comments for a document"""
+    try:
+        comments = await Comment.find(Comment.document_id == document_id).sort(-Comment.created_at).to_list()
+        return [{
+            "id": str(comment.id),
+            "author_name": comment.author_name,
+            "text": comment.text,
+            "created_at": comment.created_at.isoformat()
+        } for comment in comments]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching comments: {str(e)}"
+        )
+
+class CommentCreate(BaseModel):
+    text: str
+
+@app.post("/api/documents/{document_id}/comments")
+async def create_comment(
+    document_id: str,
+    comment_data: CommentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new comment for a document"""
+    try:
+        # Verify document exists
+        try:
+            doc = await Document.get(PydanticObjectId(document_id))
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        # Create comment
+        comment = Comment(
+            document_id=document_id,
+            author_id=str(current_user["_id"]),
+            author_name=current_user["fullname"],
+            text=comment_data.text
+        )
+        await comment.insert()
+        
+        return {
+            "id": str(comment.id),
+            "author_name": comment.author_name,
+            "text": comment.text,
+            "created_at": comment.created_at.isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating comment: {str(e)}"
+        )
+
+# --- API for Votes ---
+
+@app.get("/api/documents/{document_id}/votes")
+async def get_vote_count(document_id: str):
+    """Get vote count for a document"""
+    try:
+        vote_count = await Vote.find(Vote.document_id == document_id).count()
+        return {"vote_count": vote_count}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching vote count: {str(e)}"
+        )
+
+@app.get("/api/documents/{document_id}/votes/check")
+async def check_user_vote(
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check if current user has voted for this document"""
+    try:
+        vote = await Vote.find_one(
+            Vote.document_id == document_id,
+            Vote.user_id == str(current_user["_id"])
+        )
+        return {"has_voted": vote is not None}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error checking vote: {str(e)}"
+        )
+
+@app.post("/api/documents/{document_id}/votes")
+async def toggle_vote(
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Toggle vote for a document (vote if not voted, unvote if voted)"""
+    try:
+        # Verify document exists
+        try:
+            doc = await Document.get(PydanticObjectId(document_id))
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        user_id = str(current_user["_id"])
+        
+        # Check if user already voted
+        existing_vote = await Vote.find_one(
+            Vote.document_id == document_id,
+            Vote.user_id == user_id
+        )
+        
+        if existing_vote:
+            # Unvote: remove the vote
+            await existing_vote.delete()
+            action = "unvoted"
+        else:
+            # Vote: create new vote
+            vote = Vote(
+                document_id=document_id,
+                user_id=user_id
+            )
+            await vote.insert()
+            action = "voted"
+        
+        # Get updated vote count
+        vote_count = await Vote.find(Vote.document_id == document_id).count()
+        
+        return {
+            "action": action,
+            "vote_count": vote_count,
+            "has_voted": action == "voted"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error toggling vote: {str(e)}"
+        )
 
 # Allow downloading files from the 'uploads' directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Allow accessing avatar images - create directory if it doesn't exist
+AVATAR_DIR = "public/data/avatars"
+os.makedirs(AVATAR_DIR, exist_ok=True)
+app.mount("/data/avatars", StaticFiles(directory=AVATAR_DIR), name="avatars")
 
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 

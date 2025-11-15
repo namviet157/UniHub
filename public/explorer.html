@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Course Explorer - UniHub</title>
+    <title>Document Explorer - UniHub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
@@ -26,7 +26,7 @@
         <main class="main-content">
             <div class="content-header">
                 <div>
-                    <h1>Suggest Courses</h1>
+                    <h1>Suggest Documents</h1>
                 </div>
             </div>
             <div class="document-list" id="document-list">
@@ -37,6 +37,70 @@
     <div class="ai-chatbot" id="aiChatbot">
     </div>
 
+    <!-- Comments Modal -->
+    <div class="modal" id="commentsModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-comments"></i> Comments</h2>
+                <button class="modal-close" id="closeCommentsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="commentsList" class="comments-list">
+                    <p class="loading-text">Loading comments...</p>
+                </div>
+                <div class="comment-form-container">
+                    <form id="commentForm">
+                        <div class="form-group">
+                            <textarea id="commentText" rows="3" placeholder="Write a comment..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            Post Comment
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content modal-preview">
+            <div class="modal-header">
+                <h2 id="previewTitle"><i class="fas fa-file"></i> Document Preview</h2>
+                <button class="modal-close" id="closePreviewModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body preview-body">
+                <div id="previewContent" class="preview-content">
+                    <p class="loading-text">Loading preview...</p>
+                </div>
+                <div class="preview-controls" id="previewControls" style="display: none;">
+                    <button class="btn btn-secondary" id="prevPage">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="pageInfo">Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+                    <button class="btn btn-secondary" id="nextPage">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="previewDownload" href="#" download class="btn btn-primary">
+                    <i class="fas fa-download"></i>
+                    Download
+                </a>
+                <button type="button" class="btn btn-secondary" id="closePreviewBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF.js for PDF preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="./js/auth.js"></script>
     <script src="./js/script.js"></script>
     <script src="./js/explore.js"></script>
 </body>

@@ -42,6 +42,31 @@ async function loadUserProfile() {
             universityElement.textContent = universityName || userData.university || 'Not specified';
         }
         
+        // Update major - only show if exists
+        const majorElement = document.getElementById('userMajor');
+        const majorContainer = document.getElementById('userMajorContainer');
+        if (majorElement && majorContainer) {
+            if (userData.major && userData.major.trim()) {
+                majorElement.textContent = userData.major;
+                majorContainer.style.display = 'block';
+            } else {
+                majorContainer.style.display = 'none';
+            }
+        }
+        
+        // Update avatar if available
+        const avatarImg = document.querySelector('.profile-avatar img');
+        if (avatarImg && userData.avatar_url) {
+            avatarImg.src = userData.avatar_url;
+            avatarImg.onerror = function() {
+                this.onerror = null;
+                this.src = './data/avatars/default-avatar.png';
+            };
+        } else if (avatarImg) {
+            // Set default avatar if no avatar_url
+            avatarImg.src = './data/avatars/default-avatar.png';
+        }
+        
     } catch (error) {
         console.error('Error loading profile:', error);
         // Show error but don't redirect

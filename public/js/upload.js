@@ -3,6 +3,14 @@ const fileInput = document.getElementById('fileInput');
 const filePreview = document.getElementById('filePreview');
 const removeFileBtn = document.getElementById('removeFile');
 const uploadForm = document.getElementById('uploadForm');
+const universitySelect = document.getElementById('university');
+const facultySelect = document.getElementById('faculty');
+const courseSelect = document.getElementById('course');
+const courseCustomInput = document.getElementById('courseCustom');
+
+// Store universities and majors data
+let universitiesMajorsData = [];
+let uniqueUniversities = [];
 
 if (dropzone && fileInput) {
     dropzone.addEventListener('click', (e) => {
@@ -83,9 +91,128 @@ function formatFileSize(bytes) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+// Load universities and majors from JSON
+async function loadUniversitiesAndMajors() {
+    if (!universitySelect || !facultySelect) return;
+    
+    try {
+        universitySelect.innerHTML = '<option value="">Loading universities...</option>';
+        facultySelect.innerHTML = '<option value="">Select faculty</option>';
+        facultySelect.disabled = true;
+        
+        const response = await fetch('./data/universities_majors.json');
+        if (!response.ok) {
+            throw new Error('Failed to load universities and majors');
+        }
+        
+        const data = await response.json();
+        universitiesMajorsData = data.universities_majors || [];
+        
+        // Get unique universities
+        const universityMap = new Map();
+        universitiesMajorsData.forEach(item => {
+            if (!universityMap.has(item.id)) {
+                universityMap.set(item.id, item.name);
+            }
+        });
+        
+        uniqueUniversities = Array.from(universityMap.entries()).map(([id, name]) => ({
+            id,
+            name
+        }));
+        
+        // Populate university dropdown
+        universitySelect.innerHTML = '<option value="">Select university</option>';
+        uniqueUniversities.forEach(uni => {
+            const option = document.createElement('option');
+            option.value = uni.id;
+            option.textContent = uni.name;
+            universitySelect.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Error loading universities and majors:', error);
+        universitySelect.innerHTML = '<option value="">Error loading universities</option>';
+    }
+}
+
+// Load majors when university is selected
+function loadMajorsForUniversity(universityId) {
+    if (!facultySelect || !universityId) {
+        facultySelect.innerHTML = '<option value="">Select faculty</option>';
+        facultySelect.disabled = true;
+        return;
+    }
+    
+    // Get unique majors for selected university
+    const majorsSet = new Set();
+    universitiesMajorsData.forEach(item => {
+        if (item.id === universityId && item.major && item.major.trim() !== '') {
+            majorsSet.add(item.major);
+        }
+    });
+    
+    const majors = Array.from(majorsSet).sort();
+    
+    // Populate faculty dropdown
+    facultySelect.innerHTML = '<option value="">Select faculty</option>';
+    if (majors.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No majors available';
+        facultySelect.appendChild(option);
+        facultySelect.disabled = true;
+    } else {
+        majors.forEach(major => {
+            const option = document.createElement('option');
+            option.value = major;
+            option.textContent = major;
+            facultySelect.appendChild(option);
+        });
+        facultySelect.disabled = false;
+    }
+}
+
+// Event listener for university selection change
+if (universitySelect) {
+    universitySelect.addEventListener('change', (e) => {
+        loadMajorsForUniversity(e.target.value);
+    });
+}
+
+// Handle course selection change
+if (courseSelect && courseCustomInput) {
+    courseSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'other') {
+            courseCustomInput.style.display = 'block';
+            courseCustomInput.required = true;
+            courseCustomInput.focus();
+        } else {
+            courseCustomInput.style.display = 'none';
+            courseCustomInput.required = false;
+            courseCustomInput.value = '';
+        }
+    });
+}
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', loadUniversitiesAndMajors);
+
 if (uploadForm) {
     uploadForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        
+        // Validate custom course input if "other" is selected
+        if (courseSelect && courseSelect.value === 'other') {
+            if (!courseCustomInput || !courseCustomInput.value.trim()) {
+                alert('Vui lòng nhập tên khóa học');
+                if (courseCustomInput) {
+                    courseCustomInput.focus();
+                }
+                return;
+            }
+        }
+        
         alert('Document uploaded successfully! Our AI is now processing it for keywords and duplicate detection.');
         window.location.href = 'profile.html';
     });

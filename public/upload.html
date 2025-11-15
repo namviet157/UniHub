@@ -52,10 +52,6 @@
                             </label>
                             <select id="university" required>
                                 <option value="">Select university</option>
-                                <option value="mit">Massachusetts Institute of Technology</option>
-                                <option value="stanford">Stanford University</option>
-                                <option value="harvard">Harvard University</option>
-                                <option value="berkeley">UC Berkeley</option>
                             </select>
                         </div>
 
@@ -64,13 +60,8 @@
                                 <i class="fas fa-building"></i>
                                 Faculty
                             </label>
-                            <select id="faculty" required>
+                            <select id="faculty" required disabled>
                                 <option value="">Select faculty</option>
-                                <option value="cs">Computer Science</option>
-                                <option value="math">Mathematics</option>
-                                <option value="physics">Physics</option>
-                                <option value="engineering">Engineering</option>
-                                <option value="business">Business</option>
                             </select>
                         </div>
 
@@ -81,11 +72,57 @@
                             </label>
                             <select id="course" required>
                                 <option value="">Select course</option>
-                                <option value="cs101">CS101 - Introduction to Programming</option>
-                                <option value="cs201">CS201 - Data Structures</option>
-                                <option value="cs301">CS301 - Database Systems</option>
-                                <option value="cs401">CS401 - Machine Learning</option>
+                                <option value="ge101">GE101 - Triết học chính trị</option>
+                                <option value="ge102">GE102 - Triết học Mác – Lênin</option>
+                                <option value="ge103">GE103 - Kinh tế chính trị Mác – Lênin</option>
+                                <option value="ge104">GE104 - Chủ nghĩa xã hội khoa học</option>
+                                <option value="ge105">GE105 - Lịch sử Đảng Cộng sản Việt Nam</option>
+                                <option value="ge106">GE106 - Tư tưởng Hồ Chí Minh</option>
+                                <option value="ge107">GE107 - Pháp luật đại cương</option>
+                                <option value="ge108">GE108 - Nhà nước và pháp luật</option>
+                                <option value="ge109">GE109 - Logic học đại cương</option>
+                                <option value="ge110">GE110 - Đạo đức học</option>
+
+                                <option value="ge201">GE201 - Kỹ năng mềm</option>
+                                <option value="ge202">GE202 - Kỹ năng giao tiếp</option>
+                                <option value="ge203">GE203 - Kỹ năng thuyết trình</option>
+                                <option value="ge204">GE204 - Tư duy phản biện</option>
+                                <option value="ge205">GE205 - Viết học thuật</option>
+                                <option value="ge206">GE206 - Tâm lý học đại cương</option>
+
+                                <option value="ge301">GE301 - Giải tích</option>
+                                <option value="ge302">GE302 - Đại số tuyến tính</option>
+                                <option value="ge303">GE303 - Toán cao cấp</option>
+                                <option value="ge304">GE304 - Xác suất – Thống kê</option>
+                                <option value="ge305">GE305 - Vật lý đại cương</option>
+                                <option value="ge306">GE306 - Hóa học đại cương</option>
+                                <option value="ge307">GE307 - Sinh học đại cương</option>
+
+                                <option value="ge401">GE401 - Cơ sở khoa học máy tính</option>
+                                <option value="ge402">GE402 - Nhập môn tin học</option>
+
+                                <option value="ge501">GE501 - Kinh tế vi mô</option>
+                                <option value="ge502">GE502 - Kinh tế vĩ mô</option>
+                                <option value="ge503">GE503 - Nguyên lý quản trị</option>
+                                <option value="ge504">GE504 - Nguyên lý marketing</option>
+                                <option value="ge505">GE505 - Tài chính – Tiền tệ</option>
+                                <option value="ge506">GE506 - Kế toán căn bản</option>
+
+                                <option value="ge601">GE601 - Xã hội học đại cương</option>
+                                <option value="ge602">GE602 - Nhân học đại cương</option>
+                                <option value="ge603">GE603 - Văn minh thế giới</option>
+                                <option value="ge604">GE604 - Địa lý đại cương</option>
+                                <option value="ge605">GE605 - Triết học phương Tây và phương Đông</option>
+
+                                <option value="ge701">GE701 - Nhập môn lập trình</option>
+                                <option value="ge702">GE702 - Cấu trúc dữ liệu cơ bản</option>
+                                <option value="ge703">GE703 - Cơ sở điện tử</option>
+                                <option value="ge704">GE704 - Cơ học đại cương</option>
+                                <option value="ge705">GE705 - Vẽ kỹ thuật</option>
+                                <option value="ge706">GE706 - Hình họa – Đồ họa kỹ thuật</option>
+                                <option value="other">----- Không có -----</option>
                             </select>
+                            <input type="text" id="courseCustom" class="course-custom-input" placeholder="Nhập tên khóa học" style="display: none;">
                         </div>
 
                         <div class="form-group">

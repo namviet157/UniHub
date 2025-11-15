@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Document - UniHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>UniHub</span>
+                </div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-link">Home</a>
+                    <a href="search.html" class="nav-link">Search</a>
+                    <a href="explorer.html" class="nav-link">Explore</a>
+                    <a href="upload.html" class="nav-link active">Upload</a>
+                    <a href="profile.html" class="nav-link">Profile</a>
+                </nav>
+                <a href="login.html" class="btn btn-primary">Login</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="upload-page">
+        <div class="container">
+            <div class="upload-header">
+                <h1><i class="fas fa-cloud-upload-alt"></i> Upload Document</h1>
+                <p>Share your knowledge with the community</p>
+            </div>
+
+            <div class="duplicate-detection">
+                <i class="fas fa-shield-alt"></i>
+                <div>
+                    <strong>AI Duplicate Detection Active</strong>
+                    <p>Our AI will automatically check for duplicate files and similar content</p>
+                </div>
+            </div>
+
+            <div class="upload-container">
+                <div class="upload-form-section">
+
+                    <form class="upload-form" id="uploadForm">
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-university"></i>
+                                University
+                            </label>
+                            <select id="university" name="university" required>
+                                <option value="">Select university</option>
+                                <option value="mit">Massachusetts Institute of Technology</option>
+                                <option value="stanford">Stanford University</option>
+                                <option value="harvard">Harvard University</option>
+                                <option value="berkeley">UC Berkeley</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-building"></i>
+                                Faculty
+                            </label>
+                            <select id="faculty" name="faculty" required>
+                                <option value="">Select faculty</option>
+                                <option value="cs">Computer Science</option>
+                                <option value="math">Mathematics</option>
+                                <option value="physics">Physics</option>
+                                <option value="engineering">Engineering</option>
+                                <option value="business">Business</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-book"></i>
+                                Course
+                            </label>
+                            <select id="course" name="course" required>
+                                <option value="">Select course</option>
+                                <option value="cs101">CS101 - Introduction to Programming</option>
+                                <option value="cs201">CS201 - Data Structures</option>
+                                <option value="cs301">CS301 - Database Systems</option>
+                                <option value="cs401">CS401 - Machine Learning</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-heading"></i>
+                                Document Title
+                            </label>
+                            <input type="text" id="title" name="documentTitle"
+                                placeholder="e.g., Final Exam Practice Problems 2023" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-align-left"></i>
+                                Description
+                            </label>
+                            <textarea id="description" name="description" rows="4"
+                                placeholder="Provide a brief description of the document content..."
+                                required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-tags"></i>
+                                Document Type
+                            </label>
+                            <select id="documentType" name="documentType" required>
+                                <option value="">Select type</option>
+                                <option value="lecture">Lecture Notes</option>
+                                <option value="exam">Exam</option>
+                                <option value="assignment">Assignment</option>
+                                <option value="slides">Presentation Slides</option>
+                                <option value="summary">Summary</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-tag"></i>
+                                Tags (Optional)
+                            </label>
+                            <input type="text" id="tags" name="tags"
+                                placeholder="Add tags separated by commas (e.g., python, algorithms, beginner)">
+                            <small>Tags help others find your document</small>
+                        </div>
+
+                        <div class="upload-dropzone" id="dropzone">
+                            <div class="dropzone-content">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h3>Drag & Drop your file here</h3>
+                                <p>or</p>
+                                <label for="fileInput" class="btn btn-secondary">
+                                    <i class="fas fa-folder-open"></i>
+                                    Browse Files
+                                </label>
+                                <input type="file" id="fileInput" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                    hidden>
+                                <p class="file-info">Supported formats: PDF, DOC, DOCX, PPT, PPTX, TXT (Max 50MB)</p>
+                            </div>
+                            <div class="file-preview" id="filePreview" style="display: none;">
+                                <div class="file-preview-content">
+                                    <i class="fas fa-file-pdf"></i>
+                                    <div class="file-details">
+                                        <h4 id="fileName">document.pdf</h4>
+                                        <p id="fileSize">2.5 MB</p>
+                                    </div>
+                                    <button type="button" class="remove-file" id="removeFile">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="upload-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progressFill"></div>
+                                    </div>
+                                    <span class="progress-text" id="progressText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ai-processing-info">
+                            <i class="fas fa-magic"></i>
+                            <div>
+                                <strong>AI Processing Enabled</strong>
+                                <p>After upload, our AI will automatically generate keywords, summaries, and detect
+                                    duplicates</p>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-large btn-full">
+                            <i class="fas fa-upload"></i>
+                            Upload Document
+                        </button>
+                    </form>
+                </div>
+
+                <div class="upload-tips">
+                    <h3><i class="fas fa-lightbulb"></i> Upload Tips</h3>
+                    <div class="tip-card">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Quality Content</strong>
+                            <p>Ensure your document is clear, well-organized, and helpful for other students</p>
+                        </div>
+                    </div>
+                    <div class="tip-card">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Accurate Information</strong>
+                            <p>Double-check that faculty and course information is correct</p>
+                        </div>
+                    </div>
+                    <div class="tip-card">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Descriptive Title</strong>
+                            <p>Use clear, descriptive titles that help others understand the content</p>
+                        </div>
+                    </div>
+                    <div class="tip-card">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Add Tags</strong>
+                            <p>Tags improve discoverability and help students find relevant materials</p>
+                        </div>
+                    </div>
+                    <div class="tip-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <div>
+                            <strong>Copyright Awareness</strong>
+                            <p>Only upload documents you have the right to share</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-chatbot" id="aiChatbot">
+    </div>
+
+    <script src="./js/script.js"></script>
+    <script src="./js/upload.js"></script>
+</body>
+
+</html>

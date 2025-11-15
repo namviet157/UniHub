@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Explorer - UniHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>UniHub</span>
+                </div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-link">Home</a>
+                    <a href="search.html" class="nav-link">Search</a>
+                    <a href="explorer.html" class="nav-link active">Explore</a>
+                    <a href="upload.html" class="nav-link ">Upload</a>
+                    <a href="profile.html" class="nav-link">Profile</a>
+                </nav>
+                <a href="login.html" class="btn btn-primary">Login</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="explorer-layout">
+
+
+        <main class="main-content">
+            <div class="content-header">
+                <div>
+                    <h1>Suggest Courses</h1>
+                </div>
+            </div>
+
+
+
+            <div class="document-list" id="document-list">
+                <p>Đang tải tài liệu...</p>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="ai-chatbot" id="aiChatbot">
+    </div>
+
+    <script src="./js/script.js"></script>
+    <script src="./js/explore.js"></script>
+</body>
+
+</html>

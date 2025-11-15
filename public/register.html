@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - UniHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <h1>UniHub</h1>
+            </div>
+            <h2 class="auth-title">Create Account</h2>
+            <p class="auth-subtitle">Join the smart learning community</p>
+
+            <form class="auth-form" id="registerForm">
+                <div class="form-group">
+                    <label for="fullname">
+                        <i class="fas fa-user"></i>
+                        Full Name
+                    </label>
+                    <input type="text" id="fullname" placeholder="Enter your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">
+                        <i class="fas fa-envelope"></i>
+                        Email Address
+                    </label>
+                    <input type="email" id="email" placeholder="Enter your email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="university">
+                        <i class="fas fa-university"></i>
+                        University
+                    </label>
+                    <select id="university" required>
+                        <option value="">Select your university</option>
+                        <option value="mit">Massachusetts Institute of Technology</option>
+                        <option value="stanford">Stanford University</option>
+                        <option value="harvard">Harvard University</option>
+                        <option value="berkeley">UC Berkeley</option>
+                        <option value="oxford">Oxford University</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i>
+                        Password
+                    </label>
+                    <input type="password" id="password" placeholder="Create a password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">
+                        <i class="fas fa-lock"></i>
+                        Confirm Password
+                    </label>
+                    <input type="password" id="confirmPassword" placeholder="Confirm your password" required>
+                </div>
+
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" required>
+                        <span>I agree to the Terms of Service and Privacy Policy</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">
+                    Create Account
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="auth-divider">
+                <span>or</span>
+            </div>
+
+            <button class="btn btn-social">
+                <i class="fab fa-google"></i>
+                Sign up with Google
+            </button>
+
+            <p class="auth-switch">
+                Already have an account? <a href="login.html" class="link">Login here</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -278,17 +278,6 @@ async function loadMyDownloads() {
                             ).toLocaleDateString()}</span>
                         </div>
                     </div>
-                    <div class="document-actions-large">
-                        <button class="btn btn-primary" onclick="triggerDownload('${
-                          doc.id
-                        }', '${doc.saved_path}')">
-                            <i class="fas fa-download"></i>
-                            Download Again
-                        </button>
-                        <button class="icon-btn-large">
-                            <i class="fas fa-heart"></i>
-                        </button>
-                    </div>
                 </div>
             `;
       container.insertAdjacentHTML("beforeend", cardHTML);
@@ -302,7 +291,6 @@ async function loadMyDownloads() {
   }
 }
 
-// Thêm hàm này để xử lý việc tải lại (nó cũng sẽ log lại)
 
 function switchTab(event, tabName) {
   const tabContents = document.querySelectorAll(".tab-content");
@@ -316,6 +304,11 @@ function switchTab(event, tabName) {
   document.getElementById(tabName).classList.add("active");
 
   event.currentTarget.classList.add("active");
+
+  // Gọi hàm loadMyDownloads khi tab downloads được chọn
+  if (tabName === "downloads") {
+    loadMyDownloads();
+  }
 }
 
 // Load user profile data

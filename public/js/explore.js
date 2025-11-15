@@ -25,8 +25,154 @@ document.addEventListener("DOMContentLoaded", () => {
     // gọi hàm để lấy và hiển thị tài liệu
     fetchAndDisplayDocuments();
   }
+  documentListContainer.addEventListener("click", handleDownloadClick);
 });
+// ... (code của hàm getIconForFile) ...
 
+/**
+ * (HÀM MỚI)
+ * Xử lý sự kiện khi click nút Download
+ * Sẽ gọi API để log, sau đó mới kích hoạt tải file.
+ */
+/**
+ * (HÀM CẬP NHẬT)
+ * Xử lý sự kiện khi click nút Download
+ * Sẽ gọi API để log, sau đó mới kích hoạt tải file.
+ */
+async function handleDownloadClick(event) {
+  // Kiểm tra xem có phải click trúng nút download không
+  const downloadButton = event.target.closest(".download-btn");
+
+  if (!downloadButton) {
+    return; // Nếu không phải, bỏ qua
+  }
+
+  // Lấy thông tin từ data-attributes
+  let documentId = downloadButton.dataset.documentId;
+  const token = getToken(); // Dùng hàm từ auth.js
+
+  if (!token) {
+    alert("Bạn phải đăng nhập để tải tài liệu.");
+    return;
+  }
+
+  // Kiểm tra documentId có tồn tại không
+  if (!documentId) {
+    console.error("Document ID không tồn tại trong data-attribute");
+    alert("Lỗi: Không tìm thấy ID của tài liệu. Vui lòng tải lại trang.");
+    return;
+  }
+
+  // Xử lý documentId - đảm bảo là string hợp lệ
+  // documentId từ dataset luôn là string, nhưng có thể là JSON string hoặc string thuần
+  if (typeof documentId === "string") {
+    // Thử parse nếu là JSON string (ví dụ: '{"$oid":"..."}')
+    try {
+      const parsed = JSON.parse(documentId);
+      if (parsed && parsed.$oid) {
+        documentId = parsed.$oid;
+      } else if (typeof parsed === "string") {
+        documentId = parsed;
+      }
+    } catch (e) {
+      // Nếu không parse được, dùng trực tiếp (đã là string)
+      // Loại bỏ khoảng trắng thừa
+      documentId = documentId.trim();
+    }
+  }
+
+  // Kiểm tra documentId có hợp lệ không (MongoDB ObjectId có 24 ký tự hex)
+  if (!documentId || documentId.length === 0) {
+    console.error("Document ID rỗng sau khi xử lý");
+    alert("Lỗi: ID tài liệu không hợp lệ. Vui lòng tải lại trang.");
+    return;
+  }
+
+  console.log("Document ID để download:", documentId);
+  console.log("Document ID length:", documentId.length);
+
+  // Vô hiệu hóa nút và hiển thị spinner
+  downloadButton.disabled = true;
+  downloadButton.innerHTML =
+    '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+
+  try {
+    // Encode documentId để đảm bảo an toàn trong URL
+    const encodedDocumentId = encodeURIComponent(documentId);
+    console.log("Encoded Document ID:", encodedDocumentId);
+    
+    // Gọi API backend để download file (API sẽ tự động ghi log)
+    const response = await fetch(`/api/documents/${encodedDocumentId}/download`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      // Nếu lỗi 401, có thể token hết hạn
+      if (response.status === 401) {
+        throw new Error("Phiên làm việc hết hạn. Vui lòng đăng nhập lại.");
+      }
+
+      // Lấy thông báo lỗi từ response
+      let detailMessage = "Lỗi máy chủ không xác định.";
+      try {
+        const result = await response.json();
+        if (typeof result.detail === "string") {
+          detailMessage = result.detail;
+        } else if (
+          Array.isArray(result.detail) &&
+          result.detail[0] &&
+          result.detail[0].msg
+        ) {
+          detailMessage = result.detail[0].msg;
+        }
+      } catch (e) {
+        // Nếu không parse được JSON, dùng status text
+        detailMessage = response.statusText;
+      }
+
+      throw new Error(detailMessage);
+    }
+
+    // Lấy blob từ response
+    const blob = await response.blob();
+    
+    // Lấy tên file từ header Content-Disposition hoặc dùng documentId
+    let filename = `document_${documentId}`;
+    const contentDisposition = response.headers.get("Content-Disposition");
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Tạo URL từ blob và download
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    // Cập nhật lại nút
+    downloadButton.innerHTML = '<i class="fas fa-check"></i> Downloaded';
+    downloadButton.disabled = false;
+  } catch (error) {
+    console.error("Lỗi khi tải file:", error);
+
+    // Hiển thị thông báo lỗi
+    alert(`Không thể tải file: ${error.message}`);
+
+    // Reset nút về trạng thái cũ nếu lỗi
+    downloadButton.disabled = false;
+    downloadButton.innerHTML = '<i class="fas fa-download"></i> Download';
+  }
+}
 /**
  * Hàm này gọi API /documents/ và hiển thị kết quả ra HTML
  */
@@ -55,6 +201,46 @@ async function fetchAndDisplayDocuments() {
 
     // 3. DÙNG VÒNG LẶP ĐỂ TRUY CẬP TỪNG OBJECT
     documents.forEach((doc) => {
+      // Xử lý document ID - có thể là object với $oid hoặc string
+      let docIdString = "";
+      
+      if (doc.id) {
+        if (typeof doc.id === "object" && doc.id !== null) {
+          // Nếu là object, lấy $oid hoặc _id
+          if (doc.id.$oid) {
+            docIdString = doc.id.$oid;
+          } else if (doc.id._id) {
+            docIdString = doc.id._id;
+          } else if (typeof doc.id === "string") {
+            docIdString = doc.id;
+          } else {
+            // Thử convert sang string
+            docIdString = String(doc.id);
+          }
+        } else if (typeof doc.id === "string") {
+          docIdString = doc.id;
+        } else {
+          // Fallback: convert sang string
+          docIdString = String(doc.id);
+        }
+      } else if (doc._id) {
+        // Nếu không có id, thử lấy _id
+        if (typeof doc._id === "object" && doc._id !== null && doc._id.$oid) {
+          docIdString = doc._id.$oid;
+        } else {
+          docIdString = String(doc._id);
+        }
+      }
+      
+      // Kiểm tra docIdString có hợp lệ không
+      if (!docIdString || docIdString.trim() === "") {
+        console.warn("Document không có ID hợp lệ:", doc);
+        return; // Bỏ qua document này
+      }
+      
+      // Đảm bảo docIdString là string và trim
+      docIdString = String(docIdString).trim();
+      
       const documentCardHTML = `
             <div class="document-card-large">
                 <div class="document-icon-large">
@@ -84,18 +270,18 @@ async function fetchAndDisplayDocuments() {
                     </div>
                 </div>
                 <div class="document-actions-large">
-                    <button class="icon-btn-large">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>0</span> </button>
-
-                    <a href="/${
-                      doc.saved_path
-                    }" download class="btn btn-primary">
-                        <i class="fas fa-download"></i>
-                        Download
-
-                    </a>
-                </div>
+            <button class="icon-btn-large">
+                <i class="fas fa-arrow-up"></i>
+                <span>0</span>
+            </button>
+            
+            <button 
+                class="btn btn-primary download-btn" 
+                data-document-id="${docIdString}" 
+            >
+                <i class="fas fa-download"></i> Download
+            </button>
+            </div>
             </div>
             `;
 

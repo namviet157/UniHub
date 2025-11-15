@@ -4,7 +4,7 @@ import uvicorn
 import hashlib
 from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -20,7 +20,8 @@ from jose import JWTError, jwt
 import aioodbc
 from typing import List, Optional
 from fastapi import Query
-from beanie.operators import Or
+from beanie.operators import Or, In
+from fastapi import Query, Path
 
 # --- MongoDB Configuration (for Upload) ---
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
@@ -61,6 +62,20 @@ class Document(beanie.Document):
 
     class Settings:
         name = "Courses"
+        json_encoders = {
+            PydanticObjectId: str
+        }
+
+# --- (THÊM VÀO ĐÂY) ---
+# Model cho collection DownloadRecords
+class DownloadRecord(beanie.Document):
+    user_id: str                    # ID của người dùng (từ SQL Server) đã tải
+    document_id: PydanticObjectId   # ID của tài liệu (từ collection 'Courses') đã được tải
+    downloaded_at: datetime = Field(default_factory=datetime.now)
+
+    class Settings:
+        name = "DownloadRecord"    # Tên của collection trong MongoDB
+# --- (KẾT THÚC PHẦN THÊM MỚI) ---
 
 
 # --- Models for SQL Server (User) ---
@@ -200,11 +215,19 @@ async def lifespan(app: FastAPI):
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
         # document_models=[Document] TRUE
-        document_models=[Document] # Testing
+        document_models=[Document, DownloadRecord] # Testing
     )
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
     print(f"   - Collection: {Document.Settings.name}")
+
+    # --- (THÊM VÀO ĐÂY) ---
+    print(f"Đã kết nối Beanie tới MongoDB: {DB_NAME}")
+    print("Các collection đã được khởi tạo:")
+    # Vòng lặp này sẽ tự động in ra tên của tất cả các model bạn đăng ký
+    for model in [Document, DownloadRecord]: 
+        print(f"  -> {model.Settings.name}")
+    # --- (KẾT THÚC PHẦN THÊM MỚI) ---
 
     # Connect SQL Server (aioodbc)
     try:
@@ -379,7 +402,119 @@ async def get_my_documents(current_user: dict = Depends(get_current_user)):
         return documents
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+# Endpoint để download file và ghi log vào DownloadRecord
+@app.get("/api/documents/{document_id}/download")
+async def download_document(
+    document_id: str = Path(..., title="The ID of the document to download"),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Log để debug
+        print(f"Received document_id: {repr(document_id)}, type: {type(document_id)}")
+        
+        # Chuyển string → PydanticObjectId
+        # Loại bỏ khoảng trắng và kiểm tra độ dài
+        document_id = document_id.strip() if document_id else ""
+        
+        if not document_id:
+            print("Error: Document ID is empty")
+            raise HTTPException(status_code=400, detail="Document ID is required")
+        
+        # MongoDB ObjectId phải có 24 ký tự hex
+        if len(document_id) != 24:
+            print(f"Error: Document ID length is {len(document_id)}, expected 24")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid document ID format: expected 24 characters, got {len(document_id)}. Document ID: {document_id[:20]}..."
+            )
+        
+        try:
+            doc_id = PydanticObjectId(document_id)
+            print(f"Successfully converted to PydanticObjectId: {doc_id}")
+        except (ValueError, TypeError) as e:
+            print(f"Error converting document_id to PydanticObjectId: {e}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid document ID format: {str(e)}"
+            )
+
+        # Tìm document
+        document = await Document.get(doc_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Kiểm tra file có tồn tại không
+        file_path = document.saved_path
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on server")
+
+        # Ghi log vào DownloadRecord
+        # Kiểm tra xem đã có record chưa (tránh duplicate)
+        existing_record = await DownloadRecord.find_one(
+            DownloadRecord.user_id == current_user["_id"],
+            DownloadRecord.document_id == doc_id
+        )
+        
+        if not existing_record:
+            # Chỉ tạo record mới nếu chưa có
+            download_log = DownloadRecord(
+                user_id=current_user["_id"],
+                document_id=doc_id
+            )
+            await download_log.insert()
+
+        # Trả về file để download
+        return FileResponse(
+            path=file_path,
+            filename=document.filename,
+            media_type=document.content_type
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not download file: {e}")
+
+# Endpoint để lấy danh sách documents đã download
+@app.get("/api/me/downloads", response_model=List[Document])
+async def get_my_downloads(current_user: dict = Depends(get_current_user)):
+    try:
+        user_id_str = current_user["_id"]
+        
+        # Tìm tất cả DownloadRecord của user này
+        download_records = await DownloadRecord.find(
+            DownloadRecord.user_id == user_id_str
+        ).to_list()
+        
+        if not download_records:
+            return []
+        
+        # Lấy danh sách document_id từ download_records
+        document_ids = [record.document_id for record in download_records]
+        
+        # Lấy thông tin documents từ collection Courses
+        # Sử dụng In operator từ beanie
+        documents = await Document.find(
+            In(Document.id, document_ids)
+        ).to_list()
+        
+        # Sắp xếp theo thời gian download (mới nhất trước)
+        # Tạo dict để map document_id -> downloaded_at
+        download_time_map = {str(record.document_id): record.downloaded_at for record in download_records}
+        
+        # Sắp xếp documents theo thời gian download
+        documents.sort(key=lambda doc: download_time_map.get(str(doc.id), datetime.min), reverse=True)
+        
+        return documents
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+# --- API for User (SQL Server) ---
+
+
+@app.get("/api/health")# 
 # --- API for User (SQL Server) ---
 @app.get("/api/health")
 async def health_check():

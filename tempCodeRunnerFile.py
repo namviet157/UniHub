@@ -4,7 +4,7 @@ import uvicorn
 import hashlib
 from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -20,7 +20,8 @@ from jose import JWTError, jwt
 import aioodbc
 from typing import List, Optional
 from fastapi import Query
-from beanie.operators import Or
+from beanie.operators import Or, In
+from fastapi import Query, Path
 
 # --- MongoDB Configuration (for Upload) ---
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
@@ -61,17 +62,20 @@ class Document(beanie.Document):
 
     class Settings:
         name = "Courses"
+        json_encoders = {
+            PydanticObjectId: str
+        }
 
-# testing
+# --- (THÊM VÀO ĐÂY) ---
+# Model cho collection DownloadRecords
 class DownloadRecord(beanie.Document):
-    user_id: str  # ID của người dùng từ SQL Server (ví dụ: "1")
-    document_id: PydanticObjectId # ID của tài liệu từ Mongo (ví dụ: ObjectId("69188ebb..."))
+    user_id: str                    # ID của người dùng (từ SQL Server) đã tải
+    document_id: PydanticObjectId   # ID của tài liệu (từ collection 'Courses') đã được tải
     downloaded_at: datetime = Field(default_factory=datetime.now)
 
     class Settings:
-        name = "DownloadRecords"
-# testing
-
+        name = "DownloadRecord"    # Tên của collection trong MongoDB
+# --- (KẾT THÚC PHẦN THÊM MỚI) ---
 
 
 # --- Models for SQL Server (User) ---
@@ -216,6 +220,14 @@ async def lifespan(app: FastAPI):
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
     print(f"   - Collection: {Document.Settings.name}")
+
+    # --- (THÊM VÀO ĐÂY) ---
+    print(f"Đã kết nối Beanie tới MongoDB: {DB_NAME}")
+    print("Các collection đã được khởi tạo:")
+    # Vòng lặp này sẽ tự động in ra tên của tất cả các model bạn đăng ký
+    for model in [Document, DownloadRecord]: 
+        print(f"  -> {model.Settings.name}")
+    # --- (KẾT THÚC PHẦN THÊM MỚI) ---
 
     # Connect SQL Server (aioodbc)
     try:
@@ -390,92 +402,96 @@ async def get_my_documents(current_user: dict = Depends(get_current_user)):
         return documents
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
 
-# Testing 
-# (Đây là code mới để thêm vào app.py)
-# API 1: Ghi lại một lượt tải xuống
-@app.post("/api/documents/{doc_id}/log_download", status_code=status.HTTP_201_CREATED)
-async def log_download(
-    doc_id: PydanticObjectId, 
+# Endpoint để download file và ghi log vào DownloadRecord
+@app.get("/api/documents/{document_id}/download")
+async def download_document(
+    document_id: str = Path(..., title="The ID of the document to download"),
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Ghi lại rằng người dùng hiện tại đã tải xuống một tài liệu.
-    """
-    user_id = current_user["_id"]
-
-    # Kiểm tra xem tài liệu có tồn tại không
-    document = await Document.get(doc_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    # (Tùy chọn): Kiểm tra xem người dùng có đang tải tài liệu của chính mình không
-    # if document.user_id == user_id:
-    #     return {"status": "downloaded own document (not logged)"}
-
-    # (Tùy chọn): Kiểm tra xem đã log gần đây chưa, để tránh spam
-    existing_log = await DownloadRecord.find_one(
-        DownloadRecord.user_id == user_id,
-        DownloadRecord.document_id == doc_id
-        # (Có thể thêm điều kiện thời gian ở đây)
-    )
-
-    if not existing_log:
+    try:
+        # Chuyển string → PydanticObjectId
         try:
+            doc_id = PydanticObjectId(document_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid document ID format")
+
+        # Tìm document
+        document = await Document.get(doc_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Kiểm tra file có tồn tại không
+        file_path = document.saved_path
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on server")
+
+        # Ghi log vào DownloadRecord
+        # Kiểm tra xem đã có record chưa (tránh duplicate)
+        existing_record = await DownloadRecord.find_one(
+            DownloadRecord.user_id == current_user["_id"],
+            DownloadRecord.document_id == doc_id
+        )
+        
+        if not existing_record:
+            # Chỉ tạo record mới nếu chưa có
             download_log = DownloadRecord(
-                user_id=user_id,
+                user_id=current_user["_id"],
                 document_id=doc_id
             )
             await download_log.insert()
-            return {"status": "download logged"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    return {"status": "download already logged"}
 
+        # Trả về file để download
+        return FileResponse(
+            path=file_path,
+            filename=document.filename,
+            media_type=document.content_type
+        )
 
-# API 2: Lấy danh sách tài liệu đã tải
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not download file: {e}")
+
+# Endpoint để lấy danh sách documents đã download
 @app.get("/api/me/downloads", response_model=List[Document])
-async def get_my_downloaded_documents(current_user: dict = Depends(get_current_user)):
-    """
-    Lấy danh sách các tài liệu mà người dùng hiện tại đã tải xuống.
-    """
-    user_id = current_user["_id"]
-    
+async def get_my_downloads(current_user: dict = Depends(get_current_user)):
     try:
-        # 1. Tìm tất cả CÁC LƯỢT TẢI (records) của người dùng này
-        # Sắp xếp theo ngày tải gần nhất
+        user_id_str = current_user["_id"]
+        
+        # Tìm tất cả DownloadRecord của user này
         download_records = await DownloadRecord.find(
-            DownloadRecord.user_id == user_id
-        ).sort("-downloaded_at").to_list()
-
-        if not download_records:
-            return [] # Trả về danh sách rỗng nếu chưa tải gì
-
-        # 2. Lấy ra danh sách các ID tài liệu (không trùng lặp)
-        # (Chúng ta dùng dict.fromkeys để giữ thứ tự và loại bỏ trùng lặp)
-        document_ids = list(dict.fromkeys([record.document_id for record in download_records]))
-
-        # 3. Tìm tất cả CÁC TÀI LIỆU (documents) khớp với các ID đó
-        documents = await Document.find(
-            Document.id.in_(document_ids)
+            DownloadRecord.user_id == user_id_str
         ).to_list()
         
-        # 4. Sắp xếp lại danh sách tài liệu theo thứ tự đã tải
-        # (Vì .in_() không đảm bảo thứ tự)
-        doc_map = {doc.id: doc for doc in documents}
-        sorted_documents = [doc_map[doc_id] for doc_id in document_ids if doc_id in doc_map]
-
-        return sorted_documents
-
+        if not download_records:
+            return []
+        
+        # Lấy danh sách document_id từ download_records
+        document_ids = [record.document_id for record in download_records]
+        
+        # Lấy thông tin documents từ collection Courses
+        # Sử dụng In operator từ beanie
+        documents = await Document.find(
+            In(Document.id, document_ids)
+        ).to_list()
+        
+        # Sắp xếp theo thời gian download (mới nhất trước)
+        # Tạo dict để map document_id -> downloaded_at
+        download_time_map = {str(record.document_id): record.downloaded_at for record in download_records}
+        
+        # Sắp xếp documents theo thời gian download
+        documents.sort(key=lambda doc: download_time_map.get(str(doc.id), datetime.min), reverse=True)
+        
+        return documents
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# Testing
+# --- API for User (SQL Server) ---
 
 
-
-
+@app.get("/api/health")# 
 # --- API for User (SQL Server) ---
 @app.get("/api/health")
 async def health_check():
@@ -561,55 +577,3 @@ async def login(credentials: UserLogin):
                 (credentials.email,)
             )
             row = await cur.fetchone()
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
-    user = {
-        "id": row[0], "fullname": row[1], "email": row[2],
-        "university": row[3], "password": row[4], "created_at": row[5]
-    }
-    if not verify_password(credentials.password, user["password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": credentials.email}, expires_delta=access_token_expires
-    )
-    user_response = UserResponse(
-        id=str(user["id"]),
-        fullname=user["fullname"],
-        email=user["email"],
-        university=user["university"],
-        created_at=user["created_at"]
-    )
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=user_response
-    )
-
-
-
-@app.get("/api/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    return UserResponse(
-        id=str(current_user["_id"]),
-        fullname=current_user["fullname"],
-        email=current_user["email"],
-        university=current_user["university"],
-        created_at=current_user["created_at"]
-    )
-
-# Allow downloading files from the 'uploads' directory
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/", StaticFiles(directory="public", html=True), name="public")
-
-if __name__ == "__main__":
-    print(f"Server is running at http://127.0.0.1:8000")
-    print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
-

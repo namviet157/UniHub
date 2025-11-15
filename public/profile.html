@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
+
 <body>
     <header class="header">
         <div class="container">
@@ -27,11 +29,13 @@
         </div>
     </header>
 
+
     <div class="profile-page">
         <div class="container">
             <div class="profile-header">
                 <div class="profile-avatar">
-                    <img src="./data/avatar.png" alt="User Avatar" onerror="this.onerror=null;this.src='./data/default-avatar.png';">
+                    <img src="./data/avatar.png" alt="User Avatar"
+                        onerror="this.onerror=null;this.src='./data/default-avatar.png';">
                     <button class="avatar-edit">
                         <i class="fas fa-camera"></i>
                     </button>
@@ -87,10 +91,6 @@
                         <i class="fas fa-download"></i>
                         Downloaded
                     </button>
-                    <button class="tab-btn" onclick="switchTab(event, 'favorites')">
-                        <i class="fas fa-heart"></i>
-                        Favorites
-                    </button>
                     <button class="tab-btn" onclick="switchTab(event, 'activity')">
                         <i class="fas fa-chart-line"></i>
                         Activity
@@ -100,102 +100,14 @@
                 <div class="tab-content active" id="uploads">
                     <div class="section-header">
                         <h2>My Uploaded Documents</h2>
-                        <button class="btn btn-primary">
+                        <button class="btn btn-primary" onclick="window.location.href='upload.html'">
                             <i class="fas fa-plus"></i>
                             Upload New
                         </button>
                     </div>
 
-                    <div class="document-list">
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Python Programming Basics - Complete Guide</h3>
-                                <p class="document-description">Comprehensive guide covering variables, data types, control structures, and functions.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS101</span>
-                                    <span class="tag">Lecture Notes</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 2 days ago</span>
-                                    <span><i class="fas fa-download"></i> 234 downloads</span>
-                                    <span><i class="fas fa-arrow-up"></i> 124 upvotes</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.8</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="btn btn-secondary">
-                                    <i class="fas fa-edit"></i>
-                                    Edit
-                                </button>
-                                <button class="btn btn-danger">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Data Structures Midterm Solutions</h3>
-                                <p class="document-description">Complete solutions with explanations for midterm exam covering trees and graphs.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS201</span>
-                                    <span class="tag">Exam</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 1 week ago</span>
-                                    <span><i class="fas fa-download"></i> 189 downloads</span>
-                                    <span><i class="fas fa-arrow-up"></i> 98 upvotes</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.7</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="btn btn-secondary">
-                                    <i class="fas fa-edit"></i>
-                                    Edit
-                                </button>
-                                <button class="btn btn-danger">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-word"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Algorithm Analysis Study Guide</h3>
-                                <p class="document-description">Quick reference for algorithm complexity and analysis techniques.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS202</span>
-                                    <span class="tag">Summary</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 2 weeks ago</span>
-                                    <span><i class="fas fa-download"></i> 312 downloads</span>
-                                    <span><i class="fas fa-arrow-up"></i> 156 upvotes</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.9</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="btn btn-secondary">
-                                    <i class="fas fa-edit"></i>
-                                    Edit
-                                </button>
-                                <button class="btn btn-danger">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
+                    <div class="document-list" id="my-uploads-list">
+                        <p id="uploads-loading-message">Loading your uploads...</p>
                     </div>
                 </div>
 
@@ -204,77 +116,10 @@
                         <h2>Downloaded Documents</h2>
                     </div>
 
-                    <div class="document-list">
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Linear Algebra Complete Guide</h3>
-                                <p class="document-description">Comprehensive notes covering matrices, vector spaces, and eigenvalues.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Mathematics</span>
-                                    <span class="tag">MATH201</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> Downloaded 3 days ago</span>
-                                    <span><i class="fas fa-user"></i> Sarah Chen</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.9</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download Again
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-heart"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Machine Learning Fundamentals</h3>
-                                <p class="document-description">Introduction to supervised and unsupervised learning algorithms.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS401</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> Downloaded 1 week ago</span>
-                                    <span><i class="fas fa-user"></i> Prof. Anderson</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.8</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download Again
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-heart"></i>
-                                </button>
-                            </div>
-                        </div>
+                    <div class="document-list" id="my-downloads-list">
+                        <p id="downloads-loading-message">Loading your download history...</p>
                     </div>
                 </div>
-
-                <div class="tab-content" id="favorites">
-                    <div class="section-header">
-                        <h2>Favorite Documents</h2>
-                    </div>
-                    <div class="empty-state">
-                        <i class="fas fa-heart"></i>
-                        <h3>No favorites yet</h3>
-                        <p>Start adding documents to your favorites by clicking the heart icon</p>
-                        <a href="search.html" class="btn btn-primary">Browse Documents</a>
-                    </div>
-                </div>
-
                 <div class="tab-content" id="activity">
                     <div class="section-header">
                         <h2>Activity Overview</h2>
@@ -336,9 +181,14 @@
                         </div>
                     </div>
                 </div>
+
+
             </div>
+
         </div>
     </div>
+
+
 
     <div class="ai-chatbot" id="aiChatbot">
         <button class="chatbot-toggle" id="chatbotToggle">
@@ -376,17 +226,6 @@
     <script src="./js/script.js"></script>
     <script src="./js/auth.js"></script>
     <script src="./js/profile.js"></script>
-    <script>
-        function switchTab(event, tabName) {
-            const tabContents = document.querySelectorAll('.tab-content');
-            const tabBtns = document.querySelectorAll('.tab-btn');
-
-            tabContents.forEach(content => content.classList.remove('active'));
-            tabBtns.forEach(btn => btn.classList.remove('active'));
-
-            document.getElementById(tabName).classList.add('active');
-            event.currentTarget.classList.add('active');
-        }
-    </script>
 </body>
+
 </html>

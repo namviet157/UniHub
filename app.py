@@ -18,9 +18,9 @@ from beanie import PydanticObjectId
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import aioodbc
-from typing import List, Optional 
+from typing import List, Optional
 from fastapi import Query
-
+from beanie.operators import Or
 
 # --- MongoDB Configuration (for Upload) ---
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
@@ -29,6 +29,7 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # --- SQL Server Configuration (for Users) ---
+
 SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST", r"DESKTOP-CI5IA7D\SQLEXPRESS")
 SQL_SERVER_PORT = os.getenv("SQL_SERVER_PORT", "1433")
 SQL_SERVER_USER = os.getenv("SQL_SERVER_USER", "sa")
@@ -41,8 +42,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production"
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-
 # --- Model for MongoDB (Document) ---
+
 class Document(beanie.Document):
     filename: str = Field(..., index=True)
     saved_path: str
@@ -55,9 +56,12 @@ class Document(beanie.Document):
     documentTitle : str
     description : str
     documentType : str
-    tags : str 
+    tags : str
+    user_id: str  # Để lưu ID của người dùng từ SQL Server
+
     class Settings:
         name = "Courses"
+
 
 # --- Models for SQL Server (User) ---
 class UserRegister(BaseModel):
@@ -82,7 +86,6 @@ class TokenResponse(BaseModel):
     token_type: str
     user: UserResponse
 
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 pool: Optional[aioodbc.Pool] = None # SQL connection pool
@@ -101,6 +104,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             return False
         preprocessed = _preprocess_password(plain_password)
         return pwd_context.verify(preprocessed, hashed_password)
+
     except Exception:
         return False
 
@@ -145,21 +149,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+
         if email is None:
             raise credentials_exception
+
     except JWTError:
         raise credentials_exception
-    
+
     if pool is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database connection not available"
+
         )
-    
+
+   
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -167,15 +176,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 (email,)
             )
             row = await cur.fetchone()
-    
+
     if row is None:
         raise credentials_exception
-    
+
     user = {
         "id": row[0], "fullname": row[1], "email": row[2],
         "university": row[3], "password": row[4], "created_at": row[5]
     }
-    
+
     return {
         "_id": str(user["id"]), "fullname": user["fullname"], "email": user["email"],
         "university": user["university"], "password": user["password"], "created_at": user["created_at"]
@@ -190,7 +199,8 @@ async def lifespan(app: FastAPI):
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
-        document_models=[Document] 
+        # document_models=[Document] TRUE
+        document_models=[Document] # Testing
     )
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
@@ -215,37 +225,42 @@ async def lifespan(app: FastAPI):
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
                 await cur.fetchone()
+
     except Exception as e:
         print(f"Error connecting to SQL Server: {e}")
-        pool = None 
+        pool = None
 
-    yield 
+    yield
 
     print("Starting to shut down the server...")
-    
     app.mongodb_client.close()
     print("Disconnected from MongoDB.")
-
     if pool:
+
         pool.close()
+
         await pool.wait_closed()
+
         print("Disconnected from SQL Server")
 
 
+
+
+
 app = FastAPI(
-    title="UniHub API", 
+    title="UniHub API",
     version="1.0.0",
-    lifespan=lifespan 
+    lifespan=lifespan
+
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # --- API for Document (MongoDB) ---
 
@@ -258,14 +273,18 @@ async def create_upload_file(
     documentTitle: str = Form(...),
     description: str = Form(...),
     documentType: str = Form(...),
-    tags: str = Form(default="") 
+    tags: str = Form(default=""),
+
+    current_user: dict = Depends(get_current_user)
 ):
+
     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
+
     try:
         with open(local_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        file_size = os.path.getsize(local_file_path) 
+        file_size = os.path.getsize(local_file_path)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
@@ -281,14 +300,15 @@ async def create_upload_file(
         documentTitle = documentTitle,
         description = description,
         documentType = documentType,
-        tags = tags 
+        tags = tags,
+        user_id = current_user["_id"]
     )
     try:
         await doc.insert()
         return JSONResponse(content={
             "status": "uploaded successfully",
-            "filename": doc.filename, 
-            "mongo_id": str(doc.id) 
+            "filename": doc.filename,
+            "mongo_id": str(doc.id)
         })
     except Exception as e:
         print(f"Error saving to MongoDB: {e}")
@@ -318,7 +338,6 @@ async def get_all_documents(
             search_criteria["faculty"] = faculty
         if course:
             search_criteria["course"] = course
-
         # 3. Search
         if search_criteria:
             # If there are filters, search by criteria
@@ -326,14 +345,42 @@ async def get_all_documents(
         else:
             # If no filters, get all
             courses = await Document.find_all().to_list()
-            
-        return courses
         
+        return courses
+       
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- API for User (SQL Server) ---
+# (Đây là code mới để thêm vào app.py)
+@app.get("/api/me/documents", response_model=List[Document])
+async def get_my_documents(current_user: dict = Depends(get_current_user)):
+    try:
+        user_id_str = current_user["_id"]  # Đây là String (ví dụ: "1")
+        # 1. Tạo danh sách các điều kiện tìm kiếm
+        query_conditions = [
+            Document.user_id == user_id_str  # Tìm dạng CHUỖI (ví dụ: "1")
+        ]
 
+        # 2. Cố gắng thêm điều kiện tìm dạng SỐ
+        try:
+            user_id_num = int(user_id_str)
+            # Nếu thành công, thêm điều kiện tìm SỐ (ví dụ: 1)
+            query_conditions.append(Document.user_id == user_id_num)
+        except (ValueError, TypeError):
+            # Bỏ qua nếu user_id không phải là số (ví dụ: nó là UUID)
+            pass
+
+        # 3. Tìm bằng toán tử $or
+        # (Tìm bất kỳ tài liệu nào khớp với bất kỳ điều kiện nào trong danh sách)
+        documents = await Document.find(
+            Or(*query_conditions)
+        ).to_list()
+
+        return documents
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# --- API for User (SQL Server) ---
 @app.get("/api/health")
 async def health_check():
     sql_server_connected = False
@@ -461,9 +508,7 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
 # Allow downloading files from the 'uploads' directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
-
 
 if __name__ == "__main__":
     print(f"Server is running at http://127.0.0.1:8000")

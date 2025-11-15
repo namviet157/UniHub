@@ -254,6 +254,18 @@ if (uploadForm) {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/uploadfile/", true); // Gửi đến endpoint của FastAPI
 
+    // test
+    const token = getToken();
+
+    if (!token) {
+      alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      window.location.href = "login.html";
+      return; // Dừng việc upload
+    }
+
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    // test
+
     // Theo dõi tiến trình
     xhr.upload.onprogress = function (event) {
       if (event.lengthComputable) {

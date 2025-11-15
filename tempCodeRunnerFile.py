@@ -1,143 +1,3 @@
-# import os
-# import shutil
-# import uvicorn
-# from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException
-# from fastapi.staticfiles import StaticFiles
-# from fastapi.responses import JSONResponse
-# from motor.motor_asyncio import AsyncIOMotorClient
-# from datetime import datetime
-# from contextlib import asynccontextmanager
-# from pydantic import BaseModel, Field
-# import beanie
-# from typing import List
-# from beanie import PydanticObjectId 
-
-# MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
-# DB_NAME = "UniHub_Courses"
-
-
-# class Document(beanie.Document):
-#     filename: str = Field(..., index=True)
-#     saved_path: str
-#     content_type: str
-#     size_bytes: int
-#     uploaded_at: datetime = Field(default_factory=datetime.now)
-#     university : str
-#     faculty : str
-#     course : str
-#     documentTitle : str
-#     description : str
-#     documentType : str
-#     tags : str 
-#     class Settings:
-#         name = "Courses"
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     print("Bắt đầu khởi động server...")
-#     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
-#     await beanie.init_beanie(
-#         database=app.mongodb_client[DB_NAME],
-#         document_models=[Document] 
-#     )
-#     print(f" Collection Beanie và MongoDB sucessful!")
-#     print(f"   - Database: {DB_NAME}")
-#     print(f"   - Collection: {Document.Settings.name}")
-#     yield 
-#     print("Starting to shut down the server...")
-#     app.mongodb_client.close()
-#     print("Disconnected from MongoDB.")
-
-
-# app = FastAPI(lifespan=lifespan)
-
-# UPLOAD_DIR = "uploads"
-# os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# @app.post("/uploadfile/")
-# async def create_upload_file(
-#     file: UploadFile = File(...),
-#     university: str = Form(...),
-#     faculty: str = Form(...),
-#     course: str = Form(...),
-#     documentTitle: str = Form(...),
-#     description: str = Form(...),
-#     documentType: str = Form(...),
-#     tags: str = Form(default="") 
-# ):
-
-    
-#     # create path
-#     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-#     # save database 
-
-#     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
-
-#     # save file to folder 
-#     try:
-#         with open(local_file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-#         file_size = os.path.getsize(local_file_path) 
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
-#     finally:
-#         file.file.close()
-
-#     # 4. Creat a object 
-#     doc = Document(
-#         filename=file.filename,
-#         saved_path=db_save_path,  
-#         content_type=file.content_type,
-#         size_bytes=file_size,
-#         university = university,
-#         faculty = faculty,
-#         course = course,
-#         documentTitle = documentTitle,
-#         description = description,
-#         documentType = documentType,
-#         tags = tags 
-#     )
-
-#     # 5. Add to MongoDB 
-#     try:
-#         await doc.insert()
-        
-#         return JSONResponse(content={
-#             "status": "uploaded successfully",
-#             "filename": doc.filename, 
-#             "mongo_id": str(doc.id) 
-#         })
-        
-#     except Exception as e:
-#         print(f"Error saving to MongoDB: {e}")
-#         return JSONResponse(status_code=500, content={
-#             "detail": f"File saved successfully but could not save to database: {e}"
-#         })
-
-
-# # === 1. API To get all data ===
-# @app.get("/documents/", response_model=List[Document])
-# async def get_all_documents():
-#     """
-#     Get ALL documents in the 'Courses' collection.
-#     """
-#     try:
-#         courses = await Document.find_all().to_list()
-#         return courses
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-# app.mount("/", StaticFiles(directory="public", html=True), name="public")
-
-
-# if __name__ == "__main__":
-#     print(f"Server is running at http://127.0.0.1:8000")
-#     print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
-
 import os
 import shutil
 import uvicorn
@@ -152,25 +12,24 @@ from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field, EmailStr
 import beanie
+from typing import List
 from typing import List, Optional
 from beanie import PydanticObjectId
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import aioodbc
-from typing import List, Optional 
+from typing import List, Optional
 from fastapi import Query
+from beanie.operators import Or
 
-# ===================================================================
-# === 1. PHẦN CẤU HÌNH (Constants) ===
-# ===================================================================
-
-# --- Cấu hình MongoDB (cho Upload) ---
+# --- MongoDB Configuration (for Upload) ---
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
 DB_NAME = "UniHub_Courses"
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# --- Cấu hình SQL Server (cho Users) ---
+# --- SQL Server Configuration (for Users) ---
+
 SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST", r"DESKTOP-CI5IA7D\SQLEXPRESS")
 SQL_SERVER_PORT = os.getenv("SQL_SERVER_PORT", "1433")
 SQL_SERVER_USER = os.getenv("SQL_SERVER_USER", "sa")
@@ -178,16 +37,13 @@ SQL_SERVER_PASSWORD = os.getenv("SQL_SERVER_PASSWORD", "123456789")
 SQL_SERVER_DATABASE = os.getenv("SQL_SERVER_DATABASE", "unihub")
 SQL_SERVER_DRIVER = os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 17 for SQL Server")
 
-# --- Cấu hình Bảo mật (cho Users) ---
+# --- Security Configuration (for Users) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-# ===================================================================
-# === 2. PHẦN MODELS (PYDANTIC & BEANIE) ===
-# ===================================================================
+# --- Model for MongoDB (Document) ---
 
-# --- Model cho MongoDB (Document) ---
 class Document(beanie.Document):
     filename: str = Field(..., index=True)
     saved_path: str
@@ -200,11 +56,25 @@ class Document(beanie.Document):
     documentTitle : str
     description : str
     documentType : str
-    tags : str 
+    tags : str
+    user_id: str  # Để lưu ID của người dùng từ SQL Server
+
     class Settings:
         name = "Courses"
 
-# --- Models cho SQL Server (User) ---
+# testing
+class DownloadRecord(beanie.Document):
+    user_id: str  # ID của người dùng từ SQL Server (ví dụ: "1")
+    document_id: PydanticObjectId # ID của tài liệu từ Mongo (ví dụ: ObjectId("69188ebb..."))
+    downloaded_at: datetime = Field(default_factory=datetime.now)
+
+    class Settings:
+        name = "DownloadRecords"
+# testing
+
+
+
+# --- Models for SQL Server (User) ---
 class UserRegister(BaseModel):
     fullname: str
     email: EmailStr
@@ -227,13 +97,9 @@ class TokenResponse(BaseModel):
     token_type: str
     user: UserResponse
 
-# ===================================================================
-# === 3. CÁC HÀM HỖ TRỢ & BẢO MẬT (Cho SQL Server) ===
-# ===================================================================
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-pool: Optional[aioodbc.Pool] = None # Pool kết nối SQL
+pool: Optional[aioodbc.Pool] = None # SQL connection pool
 
 def _preprocess_password(password: str) -> str:
     if not password:
@@ -249,6 +115,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             return False
         preprocessed = _preprocess_password(plain_password)
         return pwd_context.verify(preprocessed, hashed_password)
+
     except Exception:
         return False
 
@@ -293,21 +160,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+
         if email is None:
             raise credentials_exception
+
     except JWTError:
         raise credentials_exception
-    
+
     if pool is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database connection not available"
+
         )
-    
+
+   
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -315,41 +187,37 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 (email,)
             )
             row = await cur.fetchone()
-    
+
     if row is None:
         raise credentials_exception
-    
+
     user = {
         "id": row[0], "fullname": row[1], "email": row[2],
         "university": row[3], "password": row[4], "created_at": row[5]
     }
-    
+
     return {
         "_id": str(user["id"]), "fullname": user["fullname"], "email": user["email"],
         "university": user["university"], "password": user["password"], "created_at": user["created_at"]
     }
 
-# ===================================================================
-# === 4. LIFESPAN (Kết hợp MONGODB + SQL SERVER) ===
-# ===================================================================
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- LOGIC KHỞI ĐỘNG ---
     print("Bắt đầu khởi động server...")
     global pool
 
-    # 1. Kết nối MongoDB (Beanie)
+    # Connect MongoDB (Beanie)
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
-        document_models=[Document] 
+        # document_models=[Document] TRUE
+        document_models=[Document, DownloadRecord] # Testing
     )
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
     print(f"   - Collection: {Document.Settings.name}")
 
-    # 2. Kết nối SQL Server (aioodbc)
+    # Connect SQL Server (aioodbc)
     try:
         conn_str = (
             f"DRIVER={{{SQL_SERVER_DRIVER}}};"
@@ -368,47 +236,44 @@ async def lifespan(app: FastAPI):
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
                 await cur.fetchone()
+
     except Exception as e:
         print(f"Error connecting to SQL Server: {e}")
-        pool = None # Đặt pool thành None nếu kết nối lỗi
-        # (Bạn có thể quyết định 'raise e' để dừng server nếu SQL là bắt buộc)
+        pool = None
 
-    yield # Server chạy ở đây
+    yield
 
-    # --- LOGIC TẮT SERVER ---
     print("Starting to shut down the server...")
-    
-    # 1. Ngắt kết nối MongoDB
     app.mongodb_client.close()
     print("Disconnected from MongoDB.")
-
-    # 2. Ngắt kết nối SQL Server
     if pool:
+
         pool.close()
+
         await pool.wait_closed()
+
         print("Disconnected from SQL Server")
 
 
+
+
+
 app = FastAPI(
-    title="UniHub API", 
+    title="UniHub API",
     version="1.0.0",
-    lifespan=lifespan # Sử dụng lifespan đã gộp
+    lifespan=lifespan
+
 )
 
-# Thêm CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===================================================================
-# === 6. API ENDPOINTS (Tất cả gộp tại đây) ===
-# ===================================================================
-
-# --- API cho Document (MongoDB) ---
+# --- API for Document (MongoDB) ---
 
 @app.post("/uploadfile/")
 async def create_upload_file(
@@ -419,14 +284,18 @@ async def create_upload_file(
     documentTitle: str = Form(...),
     description: str = Form(...),
     documentType: str = Form(...),
-    tags: str = Form(default="") 
+    tags: str = Form(default=""),
+
+    current_user: dict = Depends(get_current_user)
 ):
+
     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
+
     try:
         with open(local_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        file_size = os.path.getsize(local_file_path) 
+        file_size = os.path.getsize(local_file_path)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
@@ -442,14 +311,15 @@ async def create_upload_file(
         documentTitle = documentTitle,
         description = description,
         documentType = documentType,
-        tags = tags 
+        tags = tags,
+        user_id = current_user["_id"]
     )
     try:
         await doc.insert()
         return JSONResponse(content={
             "status": "uploaded successfully",
-            "filename": doc.filename, 
-            "mongo_id": str(doc.id) 
+            "filename": doc.filename,
+            "mongo_id": str(doc.id)
         })
     except Exception as e:
         print(f"Error saving to MongoDB: {e}")
@@ -469,32 +339,144 @@ async def get_all_documents(
     (e.g., /documents/?course=CS101)
     """
     try:
-        # 1. Tạo một dictionary rỗng để chứa điều kiện tìm kiếm
+        # 1. Create an empty dictionary to hold search criteria
         search_criteria = {}
 
-        # 2. Thêm điều kiện nếu chúng được cung cấp
+        # 2. Add criteria if they are provided
         if university:
             search_criteria["university"] = university
         if faculty:
             search_criteria["faculty"] = faculty
         if course:
             search_criteria["course"] = course
-
-        # 3. Tìm kiếm
+        # 3. Search
         if search_criteria:
-            # Nếu có filter, tìm kiếm theo tiêu chí
+            # If there are filters, search by criteria
             courses = await Document.find(search_criteria).to_list()
         else:
-            # Nếu không có filter, lấy tất cả
+            # If no filters, get all
             courses = await Document.find_all().to_list()
-            
-        return courses
         
+        return courses
+       
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- API cho User (SQL Server) ---
+# (Đây là code mới để thêm vào app.py)
+@app.get("/api/me/documents", response_model=List[Document])
+async def get_my_documents(current_user: dict = Depends(get_current_user)):
+    try:
+        user_id_str = current_user["_id"]  # Đây là String (ví dụ: "1")
+        # 1. Tạo danh sách các điều kiện tìm kiếm
+        query_conditions = [
+            Document.user_id == user_id_str  # Tìm dạng CHUỖI (ví dụ: "1")
+        ]
 
+        # 2. Cố gắng thêm điều kiện tìm dạng SỐ
+        try:
+            user_id_num = int(user_id_str)
+            # Nếu thành công, thêm điều kiện tìm SỐ (ví dụ: 1)
+            query_conditions.append(Document.user_id == user_id_num)
+        except (ValueError, TypeError):
+            # Bỏ qua nếu user_id không phải là số (ví dụ: nó là UUID)
+            pass
+
+        # 3. Tìm bằng toán tử $or
+        # (Tìm bất kỳ tài liệu nào khớp với bất kỳ điều kiện nào trong danh sách)
+        documents = await Document.find(
+            Or(*query_conditions)
+        ).to_list()
+
+        return documents
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# Testing 
+# (Đây là code mới để thêm vào app.py)
+# API 1: Ghi lại một lượt tải xuống
+@app.post("/api/documents/{doc_id}/log_download", status_code=status.HTTP_201_CREATED)
+async def log_download(
+    doc_id: PydanticObjectId, 
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ghi lại rằng người dùng hiện tại đã tải xuống một tài liệu.
+    """
+    user_id = current_user["_id"]
+
+    # Kiểm tra xem tài liệu có tồn tại không
+    document = await Document.get(doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # (Tùy chọn): Kiểm tra xem người dùng có đang tải tài liệu của chính mình không
+    # if document.user_id == user_id:
+    #     return {"status": "downloaded own document (not logged)"}
+
+    # (Tùy chọn): Kiểm tra xem đã log gần đây chưa, để tránh spam
+    existing_log = await DownloadRecord.find_one(
+        DownloadRecord.user_id == user_id,
+        DownloadRecord.document_id == doc_id
+        # (Có thể thêm điều kiện thời gian ở đây)
+    )
+
+    if not existing_log:
+        try:
+            download_log = DownloadRecord(
+                user_id=user_id,
+                document_id=doc_id
+            )
+            await download_log.insert()
+            return {"status": "download logged"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"status": "download already logged"}
+
+
+# API 2: Lấy danh sách tài liệu đã tải
+@app.get("/api/me/downloads", response_model=List[Document])
+async def get_my_downloaded_documents(current_user: dict = Depends(get_current_user)):
+    """
+    Lấy danh sách các tài liệu mà người dùng hiện tại đã tải xuống.
+    """
+    user_id = current_user["_id"]
+    
+    try:
+        # 1. Tìm tất cả CÁC LƯỢT TẢI (records) của người dùng này
+        # Sắp xếp theo ngày tải gần nhất
+        download_records = await DownloadRecord.find(
+            DownloadRecord.user_id == user_id
+        ).sort("-downloaded_at").to_list()
+
+        if not download_records:
+            return [] # Trả về danh sách rỗng nếu chưa tải gì
+
+        # 2. Lấy ra danh sách các ID tài liệu (không trùng lặp)
+        # (Chúng ta dùng dict.fromkeys để giữ thứ tự và loại bỏ trùng lặp)
+        document_ids = list(dict.fromkeys([record.document_id for record in download_records]))
+
+        # 3. Tìm tất cả CÁC TÀI LIỆU (documents) khớp với các ID đó
+        documents = await Document.find(
+            Document.id.in_(document_ids)
+        ).to_list()
+        
+        # 4. Sắp xếp lại danh sách tài liệu theo thứ tự đã tải
+        # (Vì .in_() không đảm bảo thứ tự)
+        doc_map = {doc.id: doc for doc in documents}
+        sorted_documents = [doc_map[doc_id] for doc_id in document_ids if doc_id in doc_map]
+
+        return sorted_documents
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+# Testing
+
+
+
+
+# --- API for User (SQL Server) ---
 @app.get("/api/health")
 async def health_check():
     sql_server_connected = False
@@ -610,6 +592,8 @@ async def login(credentials: UserLogin):
         user=user_response
     )
 
+
+
 @app.get("/api/me", response_model=UserResponse)
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return UserResponse(
@@ -620,13 +604,12 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
-# Cho phép download file từ thư mục 'uploads'
+# Allow downloading files from the 'uploads' directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
-
 
 if __name__ == "__main__":
     print(f"Server is running at http://127.0.0.1:8000")
     print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
     uvicorn.run(app, host="127.0.0.1", port=8000)
+

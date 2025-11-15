@@ -76,3 +76,36 @@ function sendMessage() {
 
   chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
 }
+
+// async function triggerDownload(docId, filePath) {
+//   const token = getToken();
+//   if (!token) {
+//     window.location.href = "login.html";
+//     return;
+//   }
+
+//   // 1. Log lượt tải (không quan trọng kết quả)
+//   fetch(`${API_BASE_URL}/api/documents/${docId}/log_download`, {
+//     method: "POST",
+//     headers: {
+//       Authorization: `Bearer ${token}`,
+//     },
+//   }).catch((err) => console.error("Error logging download:", err));
+
+//   // 2. Bắt đầu tải tệp
+//   // (Chúng ta tạo một link ẩn và click vào nó)
+//   const link = document.createElement("a");
+//   link.href = `${API_BASE_URL}/${filePath}`; // Giả sử API_BASE_URL là 'http://127.0.0.1:8000'
+//   link.download = filePath.split("/").pop(); // Lấy tên tệp
+//   document.body.appendChild(link);
+//   link.click();
+//   document.body.removeChild(link);
+// }
+//  testing
+
+// Sửa lại hàm DOMContentLoaded để gọi cả hai hàm
+document.addEventListener("DOMContentLoaded", () => {
+  loadUserProfile();
+  loadMyUploads();
+  // loadMyDownloads();
+});

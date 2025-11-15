@@ -1,40 +1,3 @@
-// // explore.js (rewritten)
-
-// document.addEventListener("DOMContentLoaded", () => {
-//   const classList = [
-//     "Engineering Mechanics - Statics",
-//     "Introduction to Computer Science",
-//     "Programming Basics",
-//     "Introduction to Web Development",
-//     "Physics I",
-//   ];
-
-//   const container = document.getElementById("classContainer");
-
-//   function renderClasses() {
-//     container.innerHTML = "";
-//     classList.forEach((cls, index) => {
-//       const div = document.createElement("div");
-//       div.className = "class-item";
-//       div.innerHTML = `
-//                 <span>${cls}</span>
-//                 <button onclick="removeClass(${index})">X</button>
-//             `;
-//       container.appendChild(div);
-//     });
-//   }
-
-//   window.removeClass = function (index) {
-//     classList.splice(index, 1);
-//     renderClasses();
-//   };
-
-//   renderClasses();
-// });
-
-/**
- * Hàm này dùng cho sidebar (Giữ nguyên của bạn)
- */
 function toggleTree(element) {
   const children = element.nextElementSibling;
   const icon = element.querySelector(".fa-chevron-right, .fa-chevron-down");
@@ -92,11 +55,6 @@ async function fetchAndDisplayDocuments() {
 
     // 3. DÙNG VÒNG LẶP ĐỂ TRUY CẬP TỪNG OBJECT
     documents.forEach((doc) => {
-      // 'doc' chính là TỪNG OBJECT (tài liệu) của bạn
-
-      // =============================================
-      // === TẠO HTML CHO CARD LỚN (ĐÃ CẬP NHẬT) ===
-      // =============================================
       const documentCardHTML = `
             <div class="document-card-large">
                 <div class="document-icon-large">
@@ -104,15 +62,15 @@ async function fetchAndDisplayDocuments() {
                 <div class="document-content-large">
                     <h3>${doc.documentTitle}</h3>
                     <p class="document-description">${doc.description}</p>
-                    
+
                     <div class="document-meta">
                         <span class="tag">${doc.documentType}</span>
                         ${generateTagsHTML(doc.tags)}
                     </div>
-                    
+
                     <div class="document-info">
                         <span>
-                            <i class="far fa-calendar"></i> 
+                            <i class="far fa-calendar"></i>
                             ${new Date(doc.uploaded_at).toLocaleDateString()}
                         </span>
                         <span>
@@ -129,11 +87,13 @@ async function fetchAndDisplayDocuments() {
                     <button class="icon-btn-large">
                         <i class="fas fa-arrow-up"></i>
                         <span>0</span> </button>
+
                     <a href="/${
                       doc.saved_path
                     }" download class="btn btn-primary">
                         <i class="fas fa-download"></i>
                         Download
+
                     </a>
                 </div>
             </div>

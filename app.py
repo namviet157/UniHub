@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 import beanie
 from typing import List
-from beanie import PydanticObjectId 
 
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
 DB_NAME = "UniHub_Courses"

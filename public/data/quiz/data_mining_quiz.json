@@ -1,0 +1,67 @@
+{
+  "quiz_title": "Quiz về Data Mining và Khoa học Dữ liệu",
+  "source_document": "01Intro.pdf",
+  "total_questions": 5,
+  "questions": [
+    {
+      "id": 1,
+      "question": "The thường được sử dụng trong lĩnh vực nào?",
+      "options": {
+        "A": "The Explosive Growth of Data: from terabytes to petabytes. Data collection and data availability. Automated data collection tools, database systems, W",
+        "B": "Simple search and query processing (Deductive) expert systems  8 Knowledge Discovery (KDD) Process  This is a view from typical database systems and d",
+        "C": "Major Issues in Data Mining  A Brief History of Data Mining and Data Mining Society  Summary  19 Data Mining Function: (1) Generalization Information ",
+        "D": "What Kinds of Patterns Can Be Mined?"
+      },
+      "correct_answer": "A",
+      "explanation": "Dựa trên khái niệm: The Explosive Growth of Data: from terabytes to petabytes Data collection and data availability Auto..."
+    },
+    {
+      "id": 2,
+      "question": "Lợi ích chính của việc sử dụng Simple là gì?",
+      "options": {
+        "A": "Data mining plays an essential role in the knowledge discovery process. Data Mining in Business Intelligence Increasing potential to support business ",
+        "B": "Major Issues in Data Mining  A Brief History of Data Mining and Data Mining Society  Summary  19 Data Mining Function: (1) Generalization Information ",
+        "C": "What Kinds of Patterns Can Be Mined?",
+        "D": "Ứng dụng chính của phương pháp này là The Explosive Growth of Data: from terabytes to pe..."
+      },
+      "correct_answer": "A",
+      "explanation": "Dựa trên khái niệm: Simple search and query processing (Deductive) expert systems  8 Knowledge Discovery (KDD) Process  ..."
+    },
+    {
+      "id": 3,
+      "question": "Đặc điểm quan trọng của What là gì?",
+      "options": {
+        "A": "Quá trình này liên quan đến Major Issues in Data Mining  A Brief History of Data Mining and Data Mining Society  Summary  19 Data Mining Function: (1)",
+        "B": "What Kinds of Patterns Can Be Mined?",
+        "C": "The Explosive Growth of Data: from terabytes to petabytes Data collection and data availability Automated data collection tools, database systems, Web",
+        "D": "Quá trình này liên quan đến Simple search and query processing (Deductive) expert systems  8 Knowledge Discovery (KDD) Process  This is a view from ty"
+      },
+      "correct_answer": "A",
+      "explanation": "Dựa trên khái niệm: What Kinds of Patterns Can Be Mined?..."
+    },
+    {
+      "id": 4,
+      "question": "Đặc điểm quan trọng của Major là gì?",
+      "options": {
+        "A": "The Explosive Growth of Data: from terabytes to petabytes Data collection and data availability Automated data collection tools, database systems, Web",
+        "B": "Ứng dụng chính của phương pháp này là Simple search and query processing (Deductive) exp...",
+        "C": "Data Mining Function: (1) Generalization Information integration and data warehouse construction Data cleaning, transformation, integration, and multi",
+        "D": "What Kinds of Patterns Can Be Mined?"
+      },
+      "correct_answer": "A",
+      "explanation": "Dựa trên khái niệm: Major Issues in Data Mining  A Brief History of Data Mining and Data Mining Society  Summary  19 Dat..."
+    },
+    {
+      "id": 5,
+      "question": "Mục đích chính của Database là gì?",
+      "options": {
+        "A": "What Kinds of Patterns Can Be Mined?",
+        "B": "Data sets and applications. Relational database, data warehouse, transactional database. Advanced data sets and advanced applications. Time-series dat",
+        "C": "The Explosive Growth of Data: from terabytes to petabytes Data collection and data availability Automated data collection tools, database systems, Web",
+        "D": "Simple search and query processing (Deductive) expert systems  8 Knowledge Discovery (KDD) Process  This is a view from typical database systems and d"
+      },
+      "correct_answer": "A",
+      "explanation": "Dựa trên khái niệm: Database-oriented data sets and applications  Relational database, data warehouse, transactional dat..."
+    }
+  ]
+}

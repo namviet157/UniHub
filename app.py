@@ -2,6 +2,7 @@ import os
 import shutil
 import uvicorn
 import hashlib
+import json
 from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -20,6 +21,61 @@ from jose import JWTError, jwt
 import aioodbc
 from typing import List, Optional 
 from fastapi import Query
+import sys
+import importlib.util
+
+# Import quiz generator from make_quiz.py
+try:
+    spec = importlib.util.spec_from_file_location("make_quiz", "make_quiz.py")
+    make_quiz_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(make_quiz_module)
+    AdvancedEnglishQuizGenerator = make_quiz_module.AdvancedEnglishQuizGenerator
+    quiz_generator = None  # Will be initialized on first use
+except Exception as e:
+    print(f"Warning: Could not load quiz generator: {e}")
+    AdvancedEnglishQuizGenerator = None
+    quiz_generator = None
+
+# Import summarizer from summarizer.py
+try:
+    spec_summarizer = importlib.util.spec_from_file_location("summarizer", "summarizer.py")
+    summarizer_module = importlib.util.module_from_spec(spec_summarizer)
+    spec_summarizer.loader.exec_module(summarizer_module)
+    ExtendedLectureSummarizer = summarizer_module.ExtendedLectureSummarizer
+    summarizer = None  # Will be initialized on first use
+except Exception as e:
+    print(f"Warning: Could not load summarizer: {e}")
+    ExtendedLectureSummarizer = None
+    summarizer = None
+
+# Import keyword extractor from keywords.py
+try:
+    spec_keywords = importlib.util.spec_from_file_location("keywords", "keywords.py")
+    keywords_module = importlib.util.module_from_spec(spec_keywords)
+    spec_keywords.loader.exec_module(keywords_module)
+    KeywordExtractor = keywords_module.KeywordExtractor
+    keyword_extractor = None  # Will be initialized on first use
+except Exception as e:
+    print(f"Warning: Could not load keyword extractor: {e}")
+    KeywordExtractor = None
+    keyword_extractor = None
+
+# PDF text extraction
+PDF_AVAILABLE = False
+PDF_LIBRARY = None
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+    PDF_LIBRARY = "PyPDF2"
+except ImportError:
+    try:
+        import pdfplumber
+        PDF_AVAILABLE = True
+        PDF_LIBRARY = "pdfplumber"
+    except ImportError:
+        PDF_AVAILABLE = False
+        PDF_LIBRARY = None
+        print("Warning: No PDF library available. Install PyPDF2 or pdfplumber for quiz generation.")
 
 
 # --- MongoDB Configuration (for Upload) ---
@@ -55,7 +111,10 @@ class Document(beanie.Document):
     documentTitle : str
     description : str
     documentType : str
-    tags : str 
+    tags : str
+    uploaded_by: Optional[str] = Field(default=None, index=True)  # User ID who uploaded
+    summary: Optional[str] = Field(default=None)  # AI-generated summary
+    keywords: List[str] = Field(default_factory=list)  # Extracted keywords
     class Settings:
         name = "Courses"
 
@@ -78,6 +137,28 @@ class Vote(beanie.Document):
         name = "Votes"
         indexes = [
             [("document_id", 1), ("user_id", 1)],  # Compound index to prevent duplicate votes
+        ]
+
+# --- Model for MongoDB (Download) ---
+class Download(beanie.Document):
+    document_id: str = Field(..., index=True)
+    user_id: str = Field(..., index=True)
+    downloaded_at: datetime = Field(default_factory=datetime.now)
+    class Settings:
+        name = "Downloads"
+        indexes = [
+            [("document_id", 1), ("user_id", 1)],  # Compound index
+        ]
+
+# --- Model for MongoDB (Favorite) ---
+class Favorite(beanie.Document):
+    document_id: str = Field(..., index=True)
+    user_id: str = Field(..., index=True)
+    favorited_at: datetime = Field(default_factory=datetime.now)
+    class Settings:
+        name = "Favorites"
+        indexes = [
+            [("document_id", 1), ("user_id", 1)],  # Compound index to prevent duplicate favorites
         ]
 
 # --- Models for SQL Server (User) ---
@@ -116,6 +197,7 @@ class TokenResponse(BaseModel):
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 pool: Optional[aioodbc.Pool] = None # SQL connection pool
 
 def _preprocess_password(password: str) -> str:
@@ -236,6 +318,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         "created_at": user["created_at"], "major": user.get("major")
     }
 
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)):
+    """Get current user if authenticated, otherwise return None"""
+    if not credentials:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except HTTPException:
+        return None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Bắt đầu khởi động server...")
@@ -245,7 +336,7 @@ async def lifespan(app: FastAPI):
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
-        document_models=[Document, Comment, Vote] 
+        document_models=[Document, Comment, Vote, Download, Favorite] 
     )
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
@@ -313,7 +404,8 @@ async def create_upload_file(
     documentTitle: str = Form(...),
     description: str = Form(...),
     documentType: str = Form(...),
-    tags: str = Form(default="") 
+    tags: str = Form(default=""),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
@@ -325,6 +417,12 @@ async def create_upload_file(
         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
         file.file.close()
+    
+    # Get user ID if authenticated
+    uploaded_by = None
+    if current_user:
+        uploaded_by = str(current_user["_id"])
+    
     doc = Document(
         filename=file.filename,
         saved_path=db_save_path,  
@@ -336,7 +434,8 @@ async def create_upload_file(
         documentTitle = documentTitle,
         description = description,
         documentType = documentType,
-        tags = tags 
+        tags = tags,
+        uploaded_by = uploaded_by
     )
     try:
         await doc.insert()
@@ -446,6 +545,239 @@ async def get_all_documents(
         
         return result
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Helper function to load comments from JSON file
+def load_comments_from_file(document_id: str) -> list:
+    """Load comments from JSON file"""
+    try:
+        COMMENTS_DIR = "public/data/comments"
+        comments_file = os.path.join(COMMENTS_DIR, f"{document_id}.json")
+        if os.path.exists(comments_file):
+            with open(comments_file, 'r', encoding='utf-8') as f:
+                comments_data = json.load(f)
+                return comments_data.get('comments', [])
+        return []
+    except Exception as e:
+        print(f"Error loading comments: {e}")
+        return []
+
+@app.get("/api/my-uploads")
+async def get_my_uploads(current_user: dict = Depends(get_current_user)):
+    """Get all documents uploaded by the current user"""
+    try:
+        user_id = str(current_user["_id"])
+        documents = await Document.find(Document.uploaded_by == user_id).sort(-Document.uploaded_at).to_list()
+        
+        result = []
+        for doc in documents:
+            doc_dict = doc.dict()
+            doc_id = str(doc.id)
+            
+            # Get vote and comment counts
+            try:
+                vote_count = await Vote.find(Vote.document_id == doc_id).count()
+            except:
+                vote_count = 0
+            
+            try:
+                comment_count = len(load_comments_from_file(doc_id))
+            except:
+                comment_count = 0
+            
+            # Convert datetime to ISO string
+            if 'uploaded_at' in doc_dict and isinstance(doc_dict['uploaded_at'], datetime):
+                doc_dict['uploaded_at'] = doc_dict['uploaded_at'].isoformat()
+            
+            result.append({
+                **doc_dict,
+                'id': doc_id,
+                '_id': doc_id,
+                'vote_count': vote_count,
+                'comment_count': comment_count
+            })
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/my-downloads")
+async def get_my_downloads(current_user: dict = Depends(get_current_user)):
+    """Get all documents downloaded by the current user"""
+    try:
+        user_id = str(current_user["_id"])
+        # Get all download records for this user
+        downloads = await Download.find(Download.user_id == user_id).sort(-Download.downloaded_at).to_list()
+        
+        if not downloads:
+            return []
+        
+        # Get unique document IDs
+        document_ids = list(set([d.document_id for d in downloads]))
+        
+        # Fetch documents
+        result = []
+        for doc_id in document_ids:
+            try:
+                doc = await Document.get(PydanticObjectId(doc_id))
+                if doc:
+                    doc_dict = doc.dict()
+                    doc_id_str = str(doc.id)
+                    
+                    # Get vote and comment counts
+                    try:
+                        vote_count = await Vote.find(Vote.document_id == doc_id_str).count()
+                    except:
+                        vote_count = 0
+                    
+                    try:
+                        comment_count = len(load_comments_from_file(doc_id_str))
+                    except:
+                        comment_count = 0
+                    
+                    # Get download date for this user
+                    user_download = next((d for d in downloads if d.document_id == doc_id), None)
+                    downloaded_at = user_download.downloaded_at.isoformat() if user_download else None
+                    
+                    # Convert datetime to ISO string
+                    if 'uploaded_at' in doc_dict and isinstance(doc_dict['uploaded_at'], datetime):
+                        doc_dict['uploaded_at'] = doc_dict['uploaded_at'].isoformat()
+                    
+                    result.append({
+                        **doc_dict,
+                        'id': doc_id_str,
+                        '_id': doc_id_str,
+                        'vote_count': vote_count,
+                        'comment_count': comment_count,
+                        'downloaded_at': downloaded_at
+                    })
+            except Exception as e:
+                print(f"Error fetching document {doc_id}: {e}")
+                continue
+        
+        # Sort by downloaded_at (most recent first)
+        result.sort(key=lambda x: x.get('downloaded_at', ''), reverse=True)
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/my-favorites")
+async def get_my_favorites(current_user: dict = Depends(get_current_user)):
+    """Get all documents favorited by the current user"""
+    try:
+        user_id = str(current_user["_id"])
+        # Get all favorite records for this user
+        favorites = await Favorite.find(Favorite.user_id == user_id).sort(-Favorite.favorited_at).to_list()
+        
+        if not favorites:
+            return []
+        
+        # Get unique document IDs
+        document_ids = list(set([f.document_id for f in favorites]))
+        
+        # Fetch documents
+        result = []
+        for doc_id in document_ids:
+            try:
+                doc = await Document.get(PydanticObjectId(doc_id))
+                if doc:
+                    doc_dict = doc.dict()
+                    doc_id_str = str(doc.id)
+                    
+                    # Get vote and comment counts
+                    try:
+                        vote_count = await Vote.find(Vote.document_id == doc_id_str).count()
+                    except:
+                        vote_count = 0
+                    
+                    try:
+                        comment_count = len(load_comments_from_file(doc_id_str))
+                    except:
+                        comment_count = 0
+                    
+                    # Get favorite date for this user
+                    user_favorite = next((f for f in favorites if f.document_id == doc_id), None)
+                    favorited_at = user_favorite.favorited_at.isoformat() if user_favorite else None
+                    
+                    # Convert datetime to ISO string
+                    if 'uploaded_at' in doc_dict and isinstance(doc_dict['uploaded_at'], datetime):
+                        doc_dict['uploaded_at'] = doc_dict['uploaded_at'].isoformat()
+                    
+                    result.append({
+                        **doc_dict,
+                        'id': doc_id_str,
+                        '_id': doc_id_str,
+                        'vote_count': vote_count,
+                        'comment_count': comment_count,
+                        'favorited_at': favorited_at
+                    })
+            except Exception as e:
+                print(f"Error fetching document {doc_id}: {e}")
+                continue
+        
+        # Sort by favorited_at (most recent first)
+        result.sort(key=lambda x: x.get('favorited_at', ''), reverse=True)
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/documents/{document_id}/download")
+async def track_download(
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Track document download"""
+    try:
+        user_id = str(current_user["_id"])
+        
+        # Check if download already exists
+        existing = await Download.find_one(
+            Download.document_id == document_id,
+            Download.user_id == user_id
+        )
+        
+        if not existing:
+            # Create new download record
+            download = Download(
+                document_id=document_id,
+                user_id=user_id
+            )
+            await download.insert()
+        
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/documents/{document_id}/favorite")
+async def toggle_favorite(
+    document_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Toggle favorite status for a document"""
+    try:
+        user_id = str(current_user["_id"])
+        
+        # Check if favorite already exists
+        existing = await Favorite.find_one(
+            Favorite.document_id == document_id,
+            Favorite.user_id == user_id
+        )
+        
+        if existing:
+            # Remove favorite
+            await existing.delete()
+            return {"status": "removed", "is_favorited": False}
+        else:
+            # Add favorite
+            favorite = Favorite(
+                document_id=document_id,
+                user_id=user_id
+            )
+            await favorite.insert()
+            return {"status": "added", "is_favorited": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -877,6 +1209,505 @@ async def toggle_vote(
 
 # Allow downloading files from the 'uploads' directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# --- Helper Functions for Quiz Generation ---
+
+def extract_text_from_pdf(file_path: str) -> str:
+    """Extract text from PDF file"""
+    if not PDF_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PDF library not available. Please install PyPDF2 or pdfplumber."
+        )
+    
+    text = ""
+    try:
+        if PDF_LIBRARY == "pdfplumber":
+            import pdfplumber
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+        else:
+            # Use PyPDF2
+            with open(file_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error extracting text from PDF: {str(e)}"
+        )
+    
+    if not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not extract text from PDF. The file might be image-based or corrupted."
+        )
+    
+    return text
+
+def get_quiz_generator():
+    """Get or initialize quiz generator"""
+    global quiz_generator
+    if quiz_generator is None and AdvancedEnglishQuizGenerator:
+        try:
+            quiz_generator = AdvancedEnglishQuizGenerator()
+        except Exception as e:
+            print(f"Error initializing quiz generator: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Quiz generator initialization failed: {str(e)}"
+            )
+    return quiz_generator
+
+def get_summarizer():
+    """Get or initialize summarizer"""
+    global summarizer
+    if summarizer is None and ExtendedLectureSummarizer:
+        try:
+            summarizer = ExtendedLectureSummarizer()
+        except Exception as e:
+            print(f"Error initializing summarizer: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Summarizer initialization failed: {str(e)}"
+            )
+    return summarizer
+
+def get_keyword_extractor():
+    """Get or initialize keyword extractor"""
+    global keyword_extractor
+    if keyword_extractor is None and KeywordExtractor:
+        try:
+            keyword_extractor = KeywordExtractor()
+        except Exception as e:
+            print(f"Error initializing keyword extractor: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Keyword extractor initialization failed: {str(e)}"
+            )
+    return keyword_extractor
+
+# --- API for Quiz Generation ---
+
+class QuizGenerateRequest(BaseModel):
+    num_questions: int = Field(default=10, ge=1, le=50)
+    include_summary: bool = Field(default=True)
+    include_keywords: bool = Field(default=True)
+
+class ProcessPDFRequest(BaseModel):
+    num_questions: int = Field(default=10, ge=1, le=50)
+    include_summary: bool = Field(default=True)
+    include_keywords: bool = Field(default=True)
+
+@app.post("/api/generate-quiz-from-file")
+async def generate_quiz_from_file(
+    file: UploadFile = File(...),
+    num_questions: int = Form(10),
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate quiz from uploaded PDF file"""
+    try:
+        # Check if file is PDF
+        if not file.content_type or "pdf" not in file.content_type.lower():
+            if not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only PDF files are supported for quiz generation"
+                )
+        
+        # Save temporary file
+        temp_file_path = os.path.join(UPLOAD_DIR, f"temp_{file.filename}")
+        try:
+            with open(temp_file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        finally:
+            file.file.close()
+        
+        # Extract text from PDF
+        text = extract_text_from_pdf(temp_file_path)
+        
+        # Clean up temp file
+        try:
+            os.remove(temp_file_path)
+        except:
+            pass
+        
+        # Generate quiz
+        generator = get_quiz_generator()
+        if not generator:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Quiz generator not available"
+            )
+        
+        quiz_data = generator.generate_complete_quiz(text, num_questions=num_questions)
+        
+        # Format quiz data to match expected format
+        formatted_quiz = {
+            "quiz_title": quiz_data.get("quiz_title", f"Quiz from {file.filename}"),
+            "source_document": file.filename,
+            "total_questions": quiz_data.get("total_questions", 0),
+            "questions": []
+        }
+        
+        for q in quiz_data.get("questions", []):
+            # Convert correct_answer from label to text if needed
+            correct_answer = q.get("correct_answer", "")
+            options = q.get("options", {})
+            
+            # If correct_answer is a label (A, B, C, D), get the text
+            if correct_answer in options:
+                correct_answer_text = options[correct_answer]
+            else:
+                # Assume correct_answer is already text
+                correct_answer_text = correct_answer
+            
+            formatted_quiz["questions"].append({
+                "id": q.get("id", len(formatted_quiz["questions"]) + 1),
+                "question": q.get("question", ""),
+                "options": options,
+                "correct_answer": correct_answer,  # Keep label for frontend
+                "correct_answer_text": correct_answer_text,  # Add text version
+                "explanation": q.get("explanation", "")
+            })
+        
+        return formatted_quiz
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating quiz: {str(e)}"
+        )
+
+@app.post("/api/documents/{document_id}/generate-quiz")
+async def generate_quiz_from_document(
+    document_id: str,
+    request: QuizGenerateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate quiz from existing document"""
+    try:
+        # Get document
+        doc = await Document.get(PydanticObjectId(document_id))
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        # Check if document is PDF
+        if not doc.content_type or "pdf" not in doc.content_type.lower():
+            if not doc.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only PDF documents are supported for quiz generation"
+                )
+        
+        # Extract text from PDF
+        file_path = doc.saved_path
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document file not found"
+            )
+        
+        text = extract_text_from_pdf(file_path)
+        
+        # Generate quiz
+        generator = get_quiz_generator()
+        if not generator:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Quiz generator not available"
+            )
+        
+        quiz_data = generator.generate_complete_quiz(text, num_questions=request.num_questions)
+        
+        # Format quiz data
+        formatted_quiz = {
+            "quiz_title": quiz_data.get("quiz_title", f"Quiz from {doc.documentTitle}"),
+            "source_document": doc.documentTitle or doc.filename,
+            "total_questions": quiz_data.get("total_questions", 0),
+            "questions": []
+        }
+        
+        for q in quiz_data.get("questions", []):
+            correct_answer = q.get("correct_answer", "")
+            options = q.get("options", {})
+            
+            if correct_answer in options:
+                correct_answer_text = options[correct_answer]
+            else:
+                correct_answer_text = correct_answer
+            
+            formatted_quiz["questions"].append({
+                "id": q.get("id", len(formatted_quiz["questions"]) + 1),
+                "question": q.get("question", ""),
+                "options": options,
+                "correct_answer": correct_answer,
+                "correct_answer_text": correct_answer_text,
+                "explanation": q.get("explanation", "")
+            })
+        
+        return formatted_quiz
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating quiz: {str(e)}"
+        )
+
+@app.post("/api/documents/{document_id}/process-pdf")
+async def process_pdf_document(
+    document_id: str,
+    request: ProcessPDFRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Process PDF document: Extract text, summarize, extract keywords, and generate quiz
+    """
+    try:
+        # Get document
+        doc = await Document.get(PydanticObjectId(document_id))
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        
+        # Check if document is PDF
+        if not doc.content_type or "pdf" not in doc.content_type.lower():
+            if not doc.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only PDF documents are supported"
+                )
+        
+        # Extract text from PDF
+        file_path = doc.saved_path
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document file not found"
+            )
+        
+        text = extract_text_from_pdf(file_path)
+        
+        result = {
+            "document_id": document_id,
+            "document_title": doc.documentTitle or doc.filename,
+            "summary": None,
+            "keywords": [],
+            "quiz": None
+        }
+        
+        # 1. Generate Summary
+        if request.include_summary:
+            try:
+                summarizer_obj = get_summarizer()
+                if summarizer_obj:
+                    summary_text = summarizer_obj.get_summary_text(file_path)
+                    result["summary"] = summary_text
+            except Exception as e:
+                print(f"Error generating summary: {e}")
+                result["summary"] = None
+        
+        # 2. Extract Keywords (from summary if available, otherwise from original text)
+        if request.include_keywords:
+            try:
+                keyword_extractor_obj = get_keyword_extractor()
+                if keyword_extractor_obj:
+                    # Use summary if available, otherwise use original text
+                    text_for_keywords = result["summary"] if result["summary"] else text
+                    keywords = keyword_extractor_obj.extract_from_text(text_for_keywords, top_n=10)
+                    result["keywords"] = keywords
+            except Exception as e:
+                print(f"Error extracting keywords: {e}")
+                result["keywords"] = []
+        
+        # 3. Generate Quiz (use summary if available for better quality)
+        try:
+            generator = get_quiz_generator()
+            if generator:
+                # Use summary if available, otherwise use original text
+                text_for_quiz = result["summary"] if result["summary"] else text
+                quiz_data = generator.generate_complete_quiz(text_for_quiz, num_questions=request.num_questions)
+                
+                # Format quiz data
+                formatted_quiz = {
+                    "quiz_title": quiz_data.get("quiz_title", f"Quiz from {doc.documentTitle}"),
+                    "source_document": doc.documentTitle or doc.filename,
+                    "total_questions": quiz_data.get("total_questions", 0),
+                    "questions": []
+                }
+                
+                for q in quiz_data.get("questions", []):
+                    correct_answer = q.get("correct_answer", "")
+                    options = q.get("options", {})
+                    
+                    if correct_answer in options:
+                        correct_answer_text = options[correct_answer]
+                    else:
+                        correct_answer_text = correct_answer
+                    
+                    formatted_quiz["questions"].append({
+                        "id": q.get("id", len(formatted_quiz["questions"]) + 1),
+                        "question": q.get("question", ""),
+                        "options": options,
+                        "correct_answer": correct_answer,
+                        "correct_answer_text": correct_answer_text,
+                        "explanation": q.get("explanation", "")
+                    })
+                
+                result["quiz"] = formatted_quiz
+        except Exception as e:
+            print(f"Error generating quiz: {e}")
+            result["quiz"] = None
+        
+        # Save summary and keywords to document in MongoDB
+        try:
+            if result["summary"]:
+                doc.summary = result["summary"]
+            if result["keywords"]:
+                doc.keywords = result["keywords"]
+            
+            if result["summary"] or result["keywords"]:
+                await doc.save()
+                print(f"Saved summary and keywords for document {document_id}")
+        except Exception as e:
+            print(f"Error saving summary/keywords to database: {e}")
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing PDF: {str(e)}"
+        )
+
+@app.post("/api/generate-quiz-from-file-complete")
+async def process_pdf_from_file(
+    file: UploadFile = File(...),
+    num_questions: int = Form(10),
+    include_summary: bool = Form(True),
+    include_keywords: bool = Form(True),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Process uploaded PDF file: Extract text, summarize, extract keywords, and generate quiz
+    """
+    try:
+        # Check if file is PDF
+        if not file.content_type or "pdf" not in file.content_type.lower():
+            if not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Only PDF files are supported"
+                )
+        
+        # Save temporary file
+        temp_file_path = os.path.join(UPLOAD_DIR, f"temp_{file.filename}")
+        try:
+            with open(temp_file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        finally:
+            file.file.close()
+        
+        # Extract text from PDF
+        text = extract_text_from_pdf(temp_file_path)
+        
+        result = {
+            "document_title": file.filename,
+            "summary": None,
+            "keywords": [],
+            "quiz": None
+        }
+        
+        # 1. Generate Summary
+        if include_summary:
+            try:
+                summarizer_obj = get_summarizer()
+                if summarizer_obj:
+                    summary_text = summarizer_obj.get_summary_text(temp_file_path)
+                    result["summary"] = summary_text
+            except Exception as e:
+                print(f"Error generating summary: {e}")
+                result["summary"] = None
+        
+        # 2. Extract Keywords
+        if include_keywords:
+            try:
+                keyword_extractor_obj = get_keyword_extractor()
+                if keyword_extractor_obj:
+                    text_for_keywords = result["summary"] if result["summary"] else text
+                    keywords = keyword_extractor_obj.extract_from_text(text_for_keywords, top_n=10)
+                    result["keywords"] = keywords
+            except Exception as e:
+                print(f"Error extracting keywords: {e}")
+                result["keywords"] = []
+        
+        # 3. Generate Quiz
+        try:
+            generator = get_quiz_generator()
+            if generator:
+                text_for_quiz = result["summary"] if result["summary"] else text
+                quiz_data = generator.generate_complete_quiz(text_for_quiz, num_questions=num_questions)
+                
+                formatted_quiz = {
+                    "quiz_title": quiz_data.get("quiz_title", f"Quiz from {file.filename}"),
+                    "source_document": file.filename,
+                    "total_questions": quiz_data.get("total_questions", 0),
+                    "questions": []
+                }
+                
+                for q in quiz_data.get("questions", []):
+                    correct_answer = q.get("correct_answer", "")
+                    options = q.get("options", {})
+                    
+                    if correct_answer in options:
+                        correct_answer_text = options[correct_answer]
+                    else:
+                        correct_answer_text = correct_answer
+                    
+                    formatted_quiz["questions"].append({
+                        "id": q.get("id", len(formatted_quiz["questions"]) + 1),
+                        "question": q.get("question", ""),
+                        "options": options,
+                        "correct_answer": correct_answer,
+                        "correct_answer_text": correct_answer_text,
+                        "explanation": q.get("explanation", "")
+                    })
+                
+                result["quiz"] = formatted_quiz
+        except Exception as e:
+            print(f"Error generating quiz: {e}")
+            result["quiz"] = None
+        
+        # Clean up temp file
+        try:
+            os.remove(temp_file_path)
+        except:
+            pass
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing PDF: {str(e)}"
+        )
 
 # Allow accessing avatar images - create directory if it doesn't exist
 AVATAR_DIR = "public/data/avatars"

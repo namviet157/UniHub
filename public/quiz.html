@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Quiz - UniHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>UniHub</span>
+                </div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-link">Home</a>
+                    <a href="search.html" class="nav-link">Search</a>
+                    <a href="explorer.html" class="nav-link">Explore</a>
+                    <a href="upload.html" class="nav-link">Upload</a>
+                    <a href="quiz.html" class="nav-link active">Quiz</a>
+                    <a href="profile.html" class="nav-link">Profile</a>
+                </nav>
+                <a href="login.html" class="btn btn-primary">Log out</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="content-header">
+                <div>
+                    <h1><i class="fas fa-question-circle"></i> Generate Quiz from PDF</h1>
+                    <p>Upload a PDF file to automatically generate quiz questions</p>
+                </div>
+            </div>
+
+            <div class="quiz-generator-container">
+                <!-- File Selection Section -->
+                <div class="quiz-section" id="fileSelectionSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-file-pdf"></i> Select PDF File</h2>
+                    </div>
+                    
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h3>Choose PDF File</h3>
+                        <p>Select a PDF file from your computer or choose from uploaded documents</p>
+                        
+                        <div class="upload-options">
+                            <label for="fileInput" class="btn btn-primary">
+                                <i class="fas fa-upload"></i>
+                                Upload New PDF
+                            </label>
+                            <input type="file" id="fileInput" accept=".pdf" hidden>
+                            
+                            <button class="btn btn-secondary" id="selectFromDocuments">
+                                <i class="fas fa-folder-open"></i>
+                                Choose from Documents
+                            </button>
+                        </div>
+                        
+                        <div id="selectedFileInfo" class="selected-file-info" style="display: none;">
+                            <i class="fas fa-file-pdf"></i>
+                            <span id="selectedFileName"></span>
+                            <button class="btn btn-small btn-secondary" id="clearSelection">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Document List (if choosing from existing) -->
+                    <div id="documentListSection" class="document-list-section" style="display: none;">
+                        <h3>Select from Uploaded Documents</h3>
+                        <div id="documentList" class="document-grid">
+                            <p class="loading-text">Loading documents...</p>
+                        </div>
+                    </div>
+
+                    <!-- Quiz Settings -->
+                    <div class="quiz-settings" id="quizSettings" style="display: none;">
+                        <h3><i class="fas fa-cog"></i> Quiz Settings</h3>
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-list-ol"></i>
+                                Number of Questions
+                            </label>
+                            <input type="number" id="numQuestions" min="1" max="50" value="10" required>
+                        </div>
+                        <button class="btn btn-primary btn-large" id="generateQuizBtn">
+                            <i class="fas fa-magic"></i>
+                            Generate Quiz
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading Section -->
+                <div class="quiz-section" id="loadingSection" style="display: none;">
+                    <div class="loading-container">
+                        <div class="spinner"></div>
+                        <h3>Generating Quiz...</h3>
+                        <p id="loadingMessage">Processing your PDF file and generating questions. This may take a few moments.</p>
+                    </div>
+                </div>
+
+                <!-- Quiz Results Section -->
+                <div class="quiz-section" id="quizResultsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2><i class="fas fa-check-circle"></i> Document Processed Successfully</h2>
+                        <div class="quiz-actions">
+                            <button class="btn btn-secondary" id="downloadQuizBtn">
+                                <i class="fas fa-download"></i>
+                                Download JSON
+                            </button>
+                            <button class="btn btn-primary" id="startQuizBtn">
+                                <i class="fas fa-play"></i>
+                                Start Quiz
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Section -->
+                    <div id="summarySection" class="result-section" style="display: none;">
+                        <div class="section-header-small">
+                            <h3><i class="fas fa-file-alt"></i> Document Summary</h3>
+                        </div>
+                        <div id="summaryContent" class="summary-content">
+                            <!-- Summary will be displayed here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Keywords Section -->
+                    <div id="keywordsSection" class="result-section" style="display: none;">
+                        <div class="section-header-small">
+                            <h3><i class="fas fa-tags"></i> Key Terms</h3>
+                        </div>
+                        <div id="keywordsContent" class="keywords-content">
+                            <!-- Keywords will be displayed here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Quiz Preview Section -->
+                    <div id="quizPreviewSection" class="result-section" style="display: none;">
+                        <div class="section-header-small">
+                            <h3><i class="fas fa-question-circle"></i> Generated Quiz</h3>
+                        </div>
+                        <div id="quizPreview" class="quiz-preview">
+                            <!-- Quiz will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Quiz Taking Modal -->
+    <div class="modal" id="quizTakingModal">
+        <div class="modal-content modal-quiz">
+            <div class="modal-header">
+                <h2 id="quizModalTitle"><i class="fas fa-question-circle"></i> Quiz</h2>
+                <button class="modal-close" id="closeQuizModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body quiz-taking-body">
+                <!-- Quiz Progress -->
+                <div class="quiz-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">Question 1 of 10</span>
+                </div>
+
+                <!-- Quiz Timer (optional) -->
+                <div class="quiz-timer" id="quizTimer" style="display: none;">
+                    <i class="fas fa-clock"></i>
+                    <span id="timerText">00:00</span>
+                </div>
+
+                <!-- Current Question -->
+                <div id="quizQuestionContainer" class="quiz-question-container">
+                    <!-- Questions will be loaded here -->
+                </div>
+
+                <!-- Quiz Navigation -->
+                <div class="quiz-navigation">
+                    <button class="btn btn-secondary" id="prevQuestionBtn" disabled>
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <button class="btn btn-primary" id="nextQuestionBtn">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-success" id="submitQuizBtn" style="display: none;">
+                        <i class="fas fa-check"></i> Submit Quiz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Results Modal -->
+    <div class="modal" id="quizResultsModal">
+        <div class="modal-content modal-quiz">
+            <div class="modal-header">
+                <h2><i class="fas fa-trophy"></i> Quiz Results</h2>
+                <button class="modal-close" id="closeResultsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="quiz-results-content" id="quizResultsContent">
+                    <!-- Results will be displayed here -->
+                </div>
+                <div class="quiz-results-actions">
+                    <button class="btn btn-primary" id="retakeQuizBtn">
+                        <i class="fas fa-redo"></i> Retake Quiz
+                    </button>
+                    <button class="btn btn-secondary" id="closeResultsBtn">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/auth.js"></script>
+    <script src="./js/script.js"></script>
+    <script src="./js/quiz.js"></script>
+</body>
+
+</html>
+

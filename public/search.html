@@ -20,6 +20,7 @@
                     <a href="search.html" class="nav-link active">Search</a>
                     <a href="explorer.html" class="nav-link">Explore</a>
                     <a href="upload.html" class="nav-link">Upload</a>
+                    <a href="quiz.html" class="nav-link">Quiz</a>
                     <a href="profile.html" class="nav-link">Profile</a>
                 </nav>
                 <a href="login.html" class="btn btn-primary">Log out</a>
@@ -33,295 +34,27 @@
                 <h1>Find Your Perfect Study Material</h1>
                 <div class="search-box-large">
                     <i class="fas fa-search"></i>
-                    <input type="text"
-                        placeholder="Search by course name or course code (e.g., CS101, Data Structures)">
-                    <button class="btn btn-primary">Search</button>
-                </div>
-                <div class="quick-searches">
-                    <span>Popular:</span>
-                    <a href="#">Machine Learning</a>
-                    <a href="#">Data Structures</a>
-                    <a href="#">Calculus</a>
-                    <a href="#">Physics</a>
+                    <input type="text" id="searchInput"
+                        placeholder="Search by title, course, university, or description...">
+                    <button class="btn btn-primary" id="searchBtn">Search</button>
                 </div>
             </div>
 
-            <div class="search-layout">
-                <aside class="search-filters">
-                    <h3><i class="fas fa-filter"></i> Filters</h3>
-
-                    <div class="filter-section">
-                        <h4>Faculty</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked>
-                            <span>Computer Science <span class="count">(245)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Mathematics <span class="count">(189)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Physics <span class="count">(156)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Engineering <span class="count">(203)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Business <span class="count">(134)</span></span>
-                        </label>
+            <div class="search-results">
+                <div class="results-header">
+                    <h2>Search Results <span class="results-count" id="resultsCount">(0 documents found)</span></h2>
+                    <div class="sort-group">
+                        <label>Sort by:</label>
+                        <select class="sort-select" id="sortSelect">
+                            <option value="relevance">Most Relevant</option>
+                            <option value="recent">Most Recent</option>
+                            <option value="popular">Most Popular</option>
+                        </select>
                     </div>
+                </div>
 
-                    <div class="filter-section">
-                        <h4>Document Type</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Lecture Notes <span class="count">(312)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Exams <span class="count">(189)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Assignments <span class="count">(256)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Slides <span class="count">(178)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Summaries <span class="count">(145)</span></span>
-                        </label>
-                    </div>
-
-                    <div class="filter-section">
-                        <h4>File Type</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>PDF <span class="count">(567)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Word <span class="count">(234)</span></span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>PowerPoint <span class="count">(189)</span></span>
-                        </label>
-                    </div>
-
-                    <div class="filter-section">
-                        <h4>Upload Date</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Last 24 hours</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Last week</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Last month</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox">
-                            <span>Last year</span>
-                        </label>
-                    </div>
-
-                    <button class="btn btn-secondary btn-full">Clear All Filters</button>
-                </aside>
-
-                <div class="search-results">
-                    <div class="results-header">
-                        <h2>Search Results <span class="results-count">(245 documents found)</span></h2>
-                        <div class="sort-group">
-                            <label>Sort by:</label>
-                            <select class="sort-select">
-                                <option>Most Relevant</option>
-                                <option>Most Recent</option>
-                                <option>Most Popular</option>
-                                <option>Highest Rated</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="document-list">
-                        <div class="document-card-large">
-                            <div class="ai-summary-badge">
-                                <i class="fas fa-sparkles"></i>
-                                <span>AI Match: 98%</span>
-                            </div>
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Introduction to Programming - Complete Course Notes</h3>
-                                <p class="document-description">Comprehensive course notes covering all topics from
-                                    CS101 including variables, control structures, functions, and object-oriented
-                                    programming basics.</p>
-                                <div class="ai-keywords">
-                                    <span class="keyword-tag">programming</span>
-                                    <span class="keyword-tag">python</span>
-                                    <span class="keyword-tag">basics</span>
-                                    <span class="keyword-tag">cs101</span>
-                                </div>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS101</span>
-                                    <span class="tag">Lecture Notes</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 3 days ago</span>
-                                    <span><i class="fas fa-user"></i> John Smith</span>
-                                    <span><i class="fas fa-download"></i> 234 downloads</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.8</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>124</span>
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Data Structures Final Exam 2023</h3>
-                                <p class="document-description">Past final exam with solutions covering arrays, linked
-                                    lists, stacks, queues, trees, and graphs.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS201</span>
-                                    <span class="tag">Exam</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 2 days ago</span>
-                                    <span><i class="fas fa-user"></i> Sarah Johnson</span>
-                                    <span><i class="fas fa-download"></i> 456 downloads</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.9</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="icon-btn-large upvoted">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>289</span>
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-word"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Algorithm Analysis Cheat Sheet</h3>
-                                <p class="document-description">Quick reference guide for Big O notation, time
-                                    complexity analysis, and common algorithm patterns.</p>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS202</span>
-                                    <span class="tag">Summary</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 1 week ago</span>
-                                    <span><i class="fas fa-user"></i> Mike Chen</span>
-                                    <span><i class="fas fa-download"></i> 178 downloads</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.7</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>156</span>
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="document-card-large">
-                            <div class="ai-summary-badge">
-                                <i class="fas fa-sparkles"></i>
-                                <span>AI Summary Available</span>
-                            </div>
-                            <div class="document-icon-large">
-                                <i class="fas fa-file-powerpoint"></i>
-                            </div>
-                            <div class="document-content-large">
-                                <h3>Database Systems Lecture Slides - Normalization</h3>
-                                <p class="document-description">Detailed slides on database normalization including 1NF,
-                                    2NF, 3NF, and BCNF with practical examples.</p>
-                                <div class="ai-keywords">
-                                    <span class="keyword-tag">database</span>
-                                    <span class="keyword-tag">normalization</span>
-                                    <span class="keyword-tag">SQL</span>
-                                </div>
-                                <div class="document-meta">
-                                    <span class="tag">Computer Science</span>
-                                    <span class="tag">CS301</span>
-                                    <span class="tag">Slides</span>
-                                </div>
-                                <div class="document-info">
-                                    <span><i class="far fa-calendar"></i> 5 days ago</span>
-                                    <span><i class="fas fa-user"></i> Prof. Anderson</span>
-                                    <span><i class="fas fa-download"></i> 312 downloads</span>
-                                    <span class="rating"><i class="fas fa-star"></i> 4.6</span>
-                                </div>
-                            </div>
-                            <div class="document-actions-large">
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>98</span>
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-download"></i>
-                                    Download
-                                </button>
-                                <button class="icon-btn-large">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pagination">
-                        <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
-                        <button class="page-btn active">1</button>
-                        <button class="page-btn">2</button>
-                        <button class="page-btn">3</button>
-                        <button class="page-btn">4</button>
-                        <button class="page-btn">5</button>
-                        <button class="page-btn"><i class="fas fa-chevron-right"></i></button>
-                    </div>
+                <div class="document-list" id="searchResultsList">
+                    <p class="loading-text">Enter a search term to find documents...</p>
                 </div>
             </div>
         </div>
@@ -361,9 +94,6 @@
     </div>
 
     <script src="./js/script.js"></script>
+    <script src="./js/search.js"></script>
 </body>
-<<<<<<< HEAD
-=======
-
->>>>>>> 4a29fb8df9526ef8faff379323afb76158f1c616
 </html>

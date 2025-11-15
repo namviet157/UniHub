@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
+
 <body>
     <header class="header">
         <div class="container">
@@ -50,7 +52,7 @@
                                 <i class="fas fa-university"></i>
                                 University
                             </label>
-                            <select id="university" required>
+                            <select id="university" name="university" required>
                                 <option value="">Select university</option>
                             </select>
                         </div>
@@ -60,7 +62,7 @@
                                 <i class="fas fa-building"></i>
                                 Faculty
                             </label>
-                            <select id="faculty" required disabled>
+                            <select id="faculty" name="faculty" required disabled>
                                 <option value="">Select faculty</option>
                             </select>
                         </div>
@@ -70,7 +72,7 @@
                                 <i class="fas fa-book"></i>
                                 Course
                             </label>
-                            <select id="course" required>
+                            <select id="course" name="course" required>
                                 <option value="">Select course</option>
                                 <option value="ge101">GE101 - Triết học chính trị</option>
                                 <option value="ge102">GE102 - Triết học Mác – Lênin</option>
@@ -122,7 +124,8 @@
                                 <option value="ge706">GE706 - Hình họa – Đồ họa kỹ thuật</option>
                                 <option value="other">----- Không có -----</option>
                             </select>
-                            <input type="text" id="courseCustom" class="course-custom-input" placeholder="Nhập tên khóa học" style="display: none;">
+                            <input type="text" id="courseCustom" class="course-custom-input"
+                                placeholder="Nhập tên khóa học" style="display: none;">
                         </div>
 
                         <div class="form-group">
@@ -297,4 +300,5 @@
     <script src="./js/script.js"></script>
     <script src="./js/upload.js"></script>
 </body>
+
 </html>

@@ -1,21 +1,193 @@
+# import os
+# import shutil
+# import uvicorn
+# from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException
+# from fastapi.staticfiles import StaticFiles
+# from fastapi.responses import JSONResponse
+# from motor.motor_asyncio import AsyncIOMotorClient
+# from datetime import datetime
+# from contextlib import asynccontextmanager
+# from pydantic import BaseModel, Field
+# import beanie
+# from typing import List
+# from beanie import PydanticObjectId 
+
+# MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
+# DB_NAME = "UniHub_Courses"
+
+
+# class Document(beanie.Document):
+#     filename: str = Field(..., index=True)
+#     saved_path: str
+#     content_type: str
+#     size_bytes: int
+#     uploaded_at: datetime = Field(default_factory=datetime.now)
+#     university : str
+#     faculty : str
+#     course : str
+#     documentTitle : str
+#     description : str
+#     documentType : str
+#     tags : str 
+#     class Settings:
+#         name = "Courses"
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     print("Bắt đầu khởi động server...")
+#     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
+#     await beanie.init_beanie(
+#         database=app.mongodb_client[DB_NAME],
+#         document_models=[Document] 
+#     )
+#     print(f" Collection Beanie và MongoDB sucessful!")
+#     print(f"   - Database: {DB_NAME}")
+#     print(f"   - Collection: {Document.Settings.name}")
+#     yield 
+#     print("Starting to shut down the server...")
+#     app.mongodb_client.close()
+#     print("Disconnected from MongoDB.")
+
+
+# app = FastAPI(lifespan=lifespan)
+
+# UPLOAD_DIR = "uploads"
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# @app.post("/uploadfile/")
+# async def create_upload_file(
+#     file: UploadFile = File(...),
+#     university: str = Form(...),
+#     faculty: str = Form(...),
+#     course: str = Form(...),
+#     documentTitle: str = Form(...),
+#     description: str = Form(...),
+#     documentType: str = Form(...),
+#     tags: str = Form(default="") 
+# ):
+
+    
+#     # create path
+#     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
+    
+#     # save database 
+
+#     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
+
+#     # save file to folder 
+#     try:
+#         with open(local_file_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+#         file_size = os.path.getsize(local_file_path) 
+#     except Exception as e:
+#         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
+#     finally:
+#         file.file.close()
+
+#     # 4. Creat a object 
+#     doc = Document(
+#         filename=file.filename,
+#         saved_path=db_save_path,  
+#         content_type=file.content_type,
+#         size_bytes=file_size,
+#         university = university,
+#         faculty = faculty,
+#         course = course,
+#         documentTitle = documentTitle,
+#         description = description,
+#         documentType = documentType,
+#         tags = tags 
+#     )
+
+#     # 5. Add to MongoDB 
+#     try:
+#         await doc.insert()
+        
+#         return JSONResponse(content={
+#             "status": "uploaded successfully",
+#             "filename": doc.filename, 
+#             "mongo_id": str(doc.id) 
+#         })
+        
+#     except Exception as e:
+#         print(f"Error saving to MongoDB: {e}")
+#         return JSONResponse(status_code=500, content={
+#             "detail": f"File saved successfully but could not save to database: {e}"
+#         })
+
+
+# # === 1. API To get all data ===
+# @app.get("/documents/", response_model=List[Document])
+# async def get_all_documents():
+#     """
+#     Get ALL documents in the 'Courses' collection.
+#     """
+#     try:
+#         courses = await Document.find_all().to_list()
+#         return courses
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# app.mount("/", StaticFiles(directory="public", html=True), name="public")
+
+
+# if __name__ == "__main__":
+#     print(f"Server is running at http://127.0.0.1:8000")
+#     print(f"Uploaded files will be saved in the directory: {os.path.abspath(UPLOAD_DIR)}")
+#     uvicorn.run(app, host="127.0.0.1", port=8000)
+
 import os
 import shutil
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException
+import hashlib
+from fastapi import FastAPI, File, UploadFile, Request, Form, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 import beanie
-from typing import List
-from beanie import PydanticObjectId 
+from typing import List, Optional
+from beanie import PydanticObjectId
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+import aioodbc
+from typing import List, Optional 
+from fastapi import Query
 
+# ===================================================================
+# === 1. PHẦN CẤU HÌNH (Constants) ===
+# ===================================================================
+
+# --- Cấu hình MongoDB (cho Upload) ---
 MONGO_CONNECTION_STRING = "mongodb://localhost:27017"
 DB_NAME = "UniHub_Courses"
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# --- Cấu hình SQL Server (cho Users) ---
+SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST", r"DESKTOP-CI5IA7D\SQLEXPRESS")
+SQL_SERVER_PORT = os.getenv("SQL_SERVER_PORT", "1433")
+SQL_SERVER_USER = os.getenv("SQL_SERVER_USER", "sa")
+SQL_SERVER_PASSWORD = os.getenv("SQL_SERVER_PASSWORD", "123456789")
+SQL_SERVER_DATABASE = os.getenv("SQL_SERVER_DATABASE", "unihub")
+SQL_SERVER_DRIVER = os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 17 for SQL Server")
 
+# --- Cấu hình Bảo mật (cho Users) ---
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
+# ===================================================================
+# === 2. PHẦN MODELS (PYDANTIC & BEANIE) ===
+# ===================================================================
+
+# --- Model cho MongoDB (Document) ---
 class Document(beanie.Document):
     filename: str = Field(..., index=True)
     saved_path: str
@@ -32,9 +204,142 @@ class Document(beanie.Document):
     class Settings:
         name = "Courses"
 
+# --- Models cho SQL Server (User) ---
+class UserRegister(BaseModel):
+    fullname: str
+    email: EmailStr
+    university: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    fullname: str
+    email: str
+    university: str
+    created_at: datetime
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+# ===================================================================
+# === 3. CÁC HÀM HỖ TRỢ & BẢO MẬT (Cho SQL Server) ===
+# ===================================================================
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+pool: Optional[aioodbc.Pool] = None # Pool kết nối SQL
+
+def _preprocess_password(password: str) -> str:
+    if not password:
+        raise ValueError("Password cannot be empty")
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        return hashlib.sha256(password_bytes).hexdigest()
+    return password
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        if not plain_password or not hashed_password:
+            return False
+        preprocessed = _preprocess_password(plain_password)
+        return pwd_context.verify(preprocessed, hashed_password)
+    except Exception:
+        return False
+
+def get_password_hash(password: str) -> str:
+    if not password:
+        raise ValueError("Password cannot be empty")
+    try:
+        preprocessed = _preprocess_password(password)
+        preprocessed_bytes = preprocessed.encode('utf-8') if isinstance(preprocessed, str) else preprocessed
+        if len(preprocessed_bytes) > 72:
+            preprocessed = preprocessed_bytes[:72].decode('utf-8', errors='ignore')
+        hashed = pwd_context.hash(preprocessed)
+        if not hashed:
+            raise ValueError("Password hashing returned empty result")
+        return hashed
+    except ValueError:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        if "72 bytes" in error_msg.lower() or "too long" in error_msg.lower():
+            try:
+                password_bytes = password.encode('utf-8')
+                preprocessed = hashlib.sha256(password_bytes).hexdigest()
+                return pwd_context.hash(preprocessed)
+            except Exception:
+                pass
+        raise ValueError(f"Failed to hash password: {error_msg}")
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT id, fullname, email, university, password, created_at FROM users WHERE email = ?",
+                (email,)
+            )
+            row = await cur.fetchone()
+    
+    if row is None:
+        raise credentials_exception
+    
+    user = {
+        "id": row[0], "fullname": row[1], "email": row[2],
+        "university": row[3], "password": row[4], "created_at": row[5]
+    }
+    
+    return {
+        "_id": str(user["id"]), "fullname": user["fullname"], "email": user["email"],
+        "university": user["university"], "password": user["password"], "created_at": user["created_at"]
+    }
+
+# ===================================================================
+# === 4. LIFESPAN (Kết hợp MONGODB + SQL SERVER) ===
+# ===================================================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # --- LOGIC KHỞI ĐỘNG ---
     print("Bắt đầu khởi động server...")
+    global pool
+
+    # 1. Kết nối MongoDB (Beanie)
     app.mongodb_client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     await beanie.init_beanie(
         database=app.mongodb_client[DB_NAME],
@@ -43,66 +348,70 @@ async def lifespan(app: FastAPI):
     print(f" Collection Beanie và MongoDB sucessful!")
     print(f"   - Database: {DB_NAME}")
     print(f"   - Collection: {Document.Settings.name}")
-    yield 
+
+    # 2. Kết nối SQL Server (aioodbc)
+    try:
+        conn_str = (
+            f"DRIVER={{{SQL_SERVER_DRIVER}}};"
+            f"SERVER={SQL_SERVER_HOST},{SQL_SERVER_PORT};"
+            f"DATABASE={SQL_SERVER_DATABASE};"
+            f"UID={SQL_SERVER_USER};"
+            f"PWD={SQL_SERVER_PASSWORD};"
+            f"TrustServerCertificate=yes;"
+        )
+        pool = await aioodbc.create_pool(
+            dsn=conn_str, minsize=1, maxsize=10, autocommit=True
+        )
+        print(f"Connected to SQL Server database: {SQL_SERVER_DATABASE}")
+        # Test connection
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 1")
+                await cur.fetchone()
+    except Exception as e:
+        print(f"Error connecting to SQL Server: {e}")
+        pool = None # Đặt pool thành None nếu kết nối lỗi
+        # (Bạn có thể quyết định 'raise e' để dừng server nếu SQL là bắt buộc)
+
+    yield # Server chạy ở đây
+
+    # --- LOGIC TẮT SERVER ---
     print("Starting to shut down the server...")
+    
+    # 1. Ngắt kết nối MongoDB
     app.mongodb_client.close()
     print("Disconnected from MongoDB.")
 
+    # 2. Ngắt kết nối SQL Server
+    if pool:
+        pool.close()
+        await pool.wait_closed()
+        print("Disconnected from SQL Server")
 
-app = FastAPI(lifespan=lifespan)
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+app = FastAPI(
+    title="UniHub API", 
+    version="1.0.0",
+    lifespan=lifespan # Sử dụng lifespan đã gộp
+)
 
+# Thêm CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# @app.post("/uploadfile/")
-# async def create_upload_file(
-#     file: UploadFile = File(...),
-#     university: str = Form(...),
-#     faculty: str = Form(...),
-#     course: str = Form(...),
-#     documentTitle: str = Form(...),
-#     description: str = Form(...),
-#     documentType: str = Form(...),
-#     tags: str = Form(default="") 
-# ):
-#     file_path = os.path.join(UPLOAD_DIR, file.filename)
-#     try:
-#         with open(file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-#         file_size = os.path.getsize(file_path)
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
-#     finally:
-#         file.file.close()
-#     doc = Document(
-#         filename=file.filename,
-#         saved_path=file_path,
-#         content_type=file.content_type,
-#         size_bytes=file_size,
-#         university = university,
-#         faculty = faculty,
-#         course = course,
-#         documentTitle = documentTitle,
-#         description = description,
-#         documentType = documentType,
-#         tags = tags 
-#     )
-#     try:
-#         await doc.insert()
-#         return JSONResponse(content={
-#             "status": "uploaded successfully",
-#             "filename": doc.filename, 
-#             "mongo_id": str(doc.id) 
-#         })
-#     except Exception as e:
-#         print(f"Error saving to MongoDB: {e}")
-#         return JSONResponse(status_code=500, content={
-#             "detail": f"File saved successfully but could not save to database: {e}"
-#         })
+# ===================================================================
+# === 6. API ENDPOINTS (Tất cả gộp tại đây) ===
+# ===================================================================
+
+# --- API cho Document (MongoDB) ---
+
 @app.post("/uploadfile/")
 async def create_upload_file(
-    # ... (các tham số Form và File giữ nguyên) ...
     file: UploadFile = File(...),
     university: str = Form(...),
     faculty: str = Form(...),
@@ -112,29 +421,19 @@ async def create_upload_file(
     documentType: str = Form(...),
     tags: str = Form(default="") 
 ):
-
-    
-    # 1. Tạo đường dẫn LƯU TRỮ CỤC BỘ (dùng \ trên Windows)
     local_file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-    # 2. Tạo đường dẫn LƯU VÀO DATABASE (luôn dùng /)
-    # Chúng ta thay thế \ bằng /
     db_save_path = os.path.join(UPLOAD_DIR, file.filename).replace("\\", "/")
-
-    # 3. Save file to folder (dùng đường dẫn cục bộ)
     try:
         with open(local_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        file_size = os.path.getsize(local_file_path) # Lấy size từ file cục bộ
+        file_size = os.path.getsize(local_file_path) 
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Do not save: {e}"})
     finally:
         file.file.close()
-
-    # 4. Creat a object (dùng đường dẫn của database)
     doc = Document(
         filename=file.filename,
-        saved_path=db_save_path,  # <--- LỖI ĐƯỢC SỬA Ở ĐÂY
+        saved_path=db_save_path,  
         content_type=file.content_type,
         size_bytes=file_size,
         university = university,
@@ -145,38 +444,185 @@ async def create_upload_file(
         documentType = documentType,
         tags = tags 
     )
-
-    # 5. Add to MongoDB (Giữ nguyên)
     try:
         await doc.insert()
-        
         return JSONResponse(content={
             "status": "uploaded successfully",
             "filename": doc.filename, 
             "mongo_id": str(doc.id) 
         })
-        
     except Exception as e:
         print(f"Error saving to MongoDB: {e}")
         return JSONResponse(status_code=500, content={
             "detail": f"File saved successfully but could not save to database: {e}"
         })
 
-
-# === 1. API To get all data ===
 @app.get("/documents/", response_model=List[Document])
-async def get_all_documents():
+async def get_all_documents(
+    university: Optional[str] = Query(None),
+    faculty: Optional[str] = Query(None),
+    course: Optional[str] = Query(None)
+):
     """
-    Get ALL documents in the 'Courses' collection.
+    Get documents in the 'Courses' collection.
+    Can be filtered by university, faculty, or course using query parameters.
+    (e.g., /documents/?course=CS101)
     """
     try:
-        courses = await Document.find_all().to_list()
+        # 1. Tạo một dictionary rỗng để chứa điều kiện tìm kiếm
+        search_criteria = {}
+
+        # 2. Thêm điều kiện nếu chúng được cung cấp
+        if university:
+            search_criteria["university"] = university
+        if faculty:
+            search_criteria["faculty"] = faculty
+        if course:
+            search_criteria["course"] = course
+
+        # 3. Tìm kiếm
+        if search_criteria:
+            # Nếu có filter, tìm kiếm theo tiêu chí
+            courses = await Document.find(search_criteria).to_list()
+        else:
+            # Nếu không có filter, lấy tất cả
+            courses = await Document.find_all().to_list()
+            
         return courses
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- API cho User (SQL Server) ---
 
+@app.get("/api/health")
+async def health_check():
+    sql_server_connected = False
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT 1")
+                    await cur.fetchone()
+                    sql_server_connected = True
+        except Exception:
+            pass
+    return {
+        "status": "healthy",
+        "message": "UniHub API is running",
+        "mongo_connected": app.mongodb_client is not None,
+        "sql_server_connected": sql_server_connected
+    }
+
+@app.post("/api/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserRegister):
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT id FROM users WHERE email = ?", (user_data.email,))
+            if await cur.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+            if not user_data.password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Password cannot be empty"
+                )
+            hashed_password = get_password_hash(user_data.password)
+            created_at = datetime.utcnow()
+            try:
+                await cur.execute(
+                    "INSERT INTO users (fullname, email, university, password, created_at) OUTPUT INSERTED.id VALUES (?, ?, ?, ?, ?)",
+                    (user_data.fullname, user_data.email, user_data.university, hashed_password, created_at)
+                )
+                result = await cur.fetchone()
+                user_id = result[0] if result else None
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error saving user to database: {e}"
+                )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_data.email}, expires_delta=access_token_expires
+    )
+    user_response = UserResponse(
+        id=str(user_id),
+        fullname=user_data.fullname,
+        email=user_data.email,
+        university=user_data.university,
+        created_at=created_at
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user_response
+    )
+
+@app.post("/api/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT id, fullname, email, university, password, created_at FROM users WHERE email = ?",
+                (credentials.email,)
+            )
+            row = await cur.fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    user = {
+        "id": row[0], "fullname": row[1], "email": row[2],
+        "university": row[3], "password": row[4], "created_at": row[5]
+    }
+    if not verify_password(credentials.password, user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": credentials.email}, expires_delta=access_token_expires
+    )
+    user_response = UserResponse(
+        id=str(user["id"]),
+        fullname=user["fullname"],
+        email=user["email"],
+        university=user["university"],
+        created_at=user["created_at"]
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user_response
+    )
+
+@app.get("/api/me", response_model=UserResponse)
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    return UserResponse(
+        id=str(current_user["_id"]),
+        fullname=current_user["fullname"],
+        email=current_user["email"],
+        university=current_user["university"],
+        created_at=current_user["created_at"]
+    )
+
+# Cho phép download file từ thư mục 'uploads'
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 

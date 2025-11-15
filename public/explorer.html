@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,355 +8,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
+
 <body>
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>UniHub</span>
-                </div>
-                <nav class="nav">
-                    <a href="index.html" class="nav-link">Home</a>
-                    <a href="search.html" class="nav-link">Search</a>
-                    <a href="explorer.html" class="nav-link active">Explore</a>
-                    <a href="upload.html" class="nav-link">Upload</a>
-                    <a href="profile.html" class="nav-link">Profile</a>
-                </nav>
-                <a href="login.html" class="btn btn-primary">Log out</a>
+                <div class="logo"> <i class="fas fa-graduation-cap"></i> <span>UniHub</span> </div>
+                <nav class="nav"> <a href="index.html" class="nav-link">Home</a> <a href="search.html"
+                        class="nav-link">Search</a> <a href="explorer.html" class="nav-link active">Explore</a> <a
+                        href="upload.html" class="nav-link">Upload</a> <a href="profile.html"
+                        class="nav-link">Profile</a> </nav> <a href="login.html" class="btn btn-primary">Log out</a>
             </div>
         </div>
     </header>
 
     <div class="explorer-layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h3><i class="fas fa-sitemap"></i> Course Navigator</h3>
-            </div>
-            <div class="sidebar-content">
-                <div class="tree-item">
-                    <div class="tree-header">
-                        <i class="fas fa-university"></i>
-                        <span>Massachusetts Institute of Technology</span>
-                    </div>
-                </div>
-
-                <div class="tree-item">
-                    <div class="tree-header" onclick="toggleTree(this)">
-                        <i class="fas fa-chevron-down"></i>
-                        <i class="fas fa-building"></i>
-                        <span>Computer Science</span>
-                    </div>
-                    <div class="tree-children">
-                        <div class="tree-item course-item active">
-                            <i class="fas fa-book"></i>
-                            <span>CS101 - Introduction to Programming</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>CS201 - Data Structures</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>CS301 - Database Systems</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>CS401 - Machine Learning</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tree-item">
-                    <div class="tree-header" onclick="toggleTree(this)">
-                        <i class="fas fa-chevron-right"></i>
-                        <i class="fas fa-building"></i>
-                        <span>Mathematics</span>
-                    </div>
-                    <div class="tree-children" style="display: none;">
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>MATH101 - Calculus I</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>MATH201 - Linear Algebra</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>MATH301 - Probability Theory</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tree-item">
-                    <div class="tree-header" onclick="toggleTree(this)">
-                        <i class="fas fa-chevron-right"></i>
-                        <i class="fas fa-building"></i>
-                        <span>Physics</span>
-                    </div>
-                    <div class="tree-children" style="display: none;">
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>PHY101 - Physics I</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>PHY202 - Physics II</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tree-item">
-                    <div class="tree-header" onclick="toggleTree(this)">
-                        <i class="fas fa-chevron-right"></i>
-                        <i class="fas fa-building"></i>
-                        <span>Engineering</span>
-                    </div>
-                    <div class="tree-children" style="display: none;">
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>ENG101 - Engineering Design</span>
-                        </div>
-                        <div class="tree-item course-item">
-                            <i class="fas fa-book"></i>
-                            <span>ENG201 - Thermodynamics</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
         <main class="main-content">
             <div class="content-header">
                 <div>
-                    <h1>CS101 - Introduction to Programming</h1>
-                    <p class="breadcrumb">
-                        <span>Computer Science</span>
-                        <i class="fas fa-chevron-right"></i>
-                        <span>CS101</span>
-                    </p>
-                </div>
-                <button class="btn btn-primary">
-                    <i class="fas fa-upload"></i>
-                    Upload Document
-                </button>
-            </div>
-
-            <div class="content-filters">
-                <div class="filter-group">
-                    <button class="filter-btn active">All</button>
-                    <button class="filter-btn">Lectures</button>
-                    <button class="filter-btn">Exams</button>
-                    <button class="filter-btn">Assignments</button>
-                    <button class="filter-btn">Notes</button>
-                </div>
-                <div class="sort-group">
-                    <label>Sort by:</label>
-                    <select class="sort-select">
-                        <option>Most Recent</option>
-                        <option>Most Popular</option>
-                        <option>Highest Rated</option>
-                    </select>
+                    <h1>Suggest Courses</h1>
                 </div>
             </div>
-
-            <div class="document-list">
-                <div class="document-card-large">
-                    <div class="document-icon-large">
-                        <i class="fas fa-file-pdf"></i>
-                    </div>
-                    <div class="document-content-large">
-                        <h3>Python Programming Basics - Complete Guide</h3>
-                        <p class="document-description">Comprehensive guide covering variables, data types, control structures, and functions. Perfect for beginners.</p>
-                        <div class="document-meta">
-                            <span class="tag">Lecture Notes</span>
-                            <span class="tag">Python</span>
-                            <span class="tag">Beginner</span>
-                        </div>
-                        <div class="document-info">
-                            <span><i class="far fa-calendar"></i> 2 days ago</span>
-                            <span><i class="fas fa-user"></i> John Smith</span>
-                            <span><i class="fas fa-download"></i> 234 downloads</span>
-                            <span class="rating"><i class="fas fa-star"></i> 4.8</span>
-                        </div>
-                    </div>
-                    <div class="document-actions-large">
-                        <button class="icon-btn-large upvoted">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>124</span>
-                        </button>
-                        <button class="btn btn-primary">
-                            <i class="fas fa-download"></i>
-                            Download
-                        </button>
-                        <button class="icon-btn-large">
-                            <i class="fas fa-info-circle"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="document-card-large">
-                    <div class="ai-summary-badge">
-                        <i class="fas fa-sparkles"></i>
-                        <span>AI Summary Available</span>
-                    </div>
-                    <div class="document-icon-large">
-                        <i class="fas fa-file-pdf"></i>
-                    </div>
-                    <div class="document-content-large">
-                        <h3>Final Exam Practice Problems 2023</h3>
-                        <p class="document-description">Collection of practice problems from previous final exams with detailed solutions and explanations.</p>
-                        <div class="ai-keywords">
-                            <span class="keyword-tag">loops</span>
-                            <span class="keyword-tag">functions</span>
-                            <span class="keyword-tag">algorithms</span>
-                            <span class="keyword-tag">recursion</span>
-                        </div>
-                        <div class="document-meta">
-                            <span class="tag">Exam</span>
-                            <span class="tag">Practice</span>
-                        </div>
-                        <div class="document-info">
-                            <span><i class="far fa-calendar"></i> 5 days ago</span>
-                            <span><i class="fas fa-user"></i> Sarah Johnson</span>
-                            <span><i class="fas fa-download"></i> 456 downloads</span>
-                            <span class="rating"><i class="fas fa-star"></i> 4.9</span>
-                        </div>
-                    </div>
-                    <div class="document-actions-large">
-                        <button class="icon-btn-large">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>289</span>
-                        </button>
-                        <button class="btn btn-primary">
-                            <i class="fas fa-download"></i>
-                            Download
-                        </button>
-                        <button class="icon-btn-large">
-                            <i class="fas fa-info-circle"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="document-card-large">
-                    <div class="document-icon-large">
-                        <i class="fas fa-file-powerpoint"></i>
-                    </div>
-                    <div class="document-content-large">
-                        <h3>Object-Oriented Programming Concepts</h3>
-                        <p class="document-description">Lecture slides covering classes, objects, inheritance, polymorphism, and encapsulation with examples.</p>
-                        <div class="document-meta">
-                            <span class="tag">Lecture Slides</span>
-                            <span class="tag">OOP</span>
-                        </div>
-                        <div class="document-info">
-                            <span><i class="far fa-calendar"></i> 1 week ago</span>
-                            <span><i class="fas fa-user"></i> Prof. Anderson</span>
-                            <span><i class="fas fa-download"></i> 178 downloads</span>
-                            <span class="rating"><i class="fas fa-star"></i> 4.7</span>
-                        </div>
-                    </div>
-                    <div class="document-actions-large">
-                        <button class="icon-btn-large">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>156</span>
-                        </button>
-                        <button class="btn btn-primary">
-                            <i class="fas fa-download"></i>
-                            Download
-                        </button>
-                        <button class="icon-btn-large">
-                            <i class="fas fa-info-circle"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="document-card-large">
-                    <div class="document-icon-large">
-                        <i class="fas fa-file-word"></i>
-                    </div>
-                    <div class="document-content-large">
-                        <h3>Assignment 3 - File Handling Solutions</h3>
-                        <p class="document-description">Complete solutions and explanations for Assignment 3 covering file I/O operations and error handling.</p>
-                        <div class="document-meta">
-                            <span class="tag">Assignment</span>
-                            <span class="tag">Solutions</span>
-                        </div>
-                        <div class="document-info">
-                            <span><i class="far fa-calendar"></i> 2 weeks ago</span>
-                            <span><i class="fas fa-user"></i> Mike Chen</span>
-                            <span><i class="fas fa-download"></i> 312 downloads</span>
-                            <span class="rating"><i class="fas fa-star"></i> 4.6</span>
-                        </div>
-                    </div>
-                    <div class="document-actions-large">
-                        <button class="icon-btn-large">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>98</span>
-                        </button>
-                        <button class="btn btn-primary">
-                            <i class="fas fa-download"></i>
-                            Download
-                        </button>
-                        <button class="icon-btn-large">
-                            <i class="fas fa-info-circle"></i>
-                        </button>
-                    </div>
-                </div>
+            <div class="document-list" id="document-list">
+                <p>Loading...</p>
             </div>
         </main>
     </div>
-
     <div class="ai-chatbot" id="aiChatbot">
-        <button class="chatbot-toggle" id="chatbotToggle">
-            <i class="fas fa-robot"></i>
-        </button>
-        <div class="chatbot-window" id="chatbotWindow">
-            <div class="chatbot-header">
-                <div>
-                    <i class="fas fa-robot"></i>
-                    <span>AI Search Assistant</span>
-                </div>
-                <button class="chatbot-close" id="chatbotClose">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="chatbot-messages" id="chatbotMessages">
-                <div class="chatbot-message bot-message">
-                    <div class="message-avatar">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    <div class="message-content">
-                        Hello! I'm your AI assistant. How can I help you find documents today?
-                    </div>
-                </div>
-            </div>
-            <div class="chatbot-input">
-                <input type="text" placeholder="Ask me anything..." id="chatbotInput">
-                <button id="chatbotSend">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
     </div>
 
     <script src="./js/script.js"></script>
-    <script>
-        function toggleTree(element) {
-            const children = element.nextElementSibling;
-            const icon = element.querySelector('.fa-chevron-right, .fa-chevron-down');
-
-            if (children.style.display === 'none') {
-                children.style.display = 'block';
-                icon.classList.remove('fa-chevron-right');
-                icon.classList.add('fa-chevron-down');
-            } else {
-                children.style.display = 'none';
-                icon.classList.remove('fa-chevron-down');
-                icon.classList.add('fa-chevron-right');
-            }
-        }
-    </script>
+    <script src="./js/explore.js"></script>
 </body>
+
 </html>

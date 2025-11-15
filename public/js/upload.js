@@ -199,7 +199,7 @@ if (courseSelect && courseCustomInput) {
 document.addEventListener('DOMContentLoaded', loadUniversitiesAndMajors);
 
 if (uploadForm) {
-    uploadForm.addEventListener('submit', (e) => {
+    uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         // Validate custom course input if "other" is selected
@@ -213,7 +213,75 @@ if (uploadForm) {
             }
         }
         
-        alert('Document uploaded successfully! Our AI is now processing it for keywords and duplicate detection.');
-        window.location.href = 'profile.html';
+        // Get form data
+        const formData = new FormData();
+        
+        // Get file
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('Vui lòng chọn file để upload');
+            return;
+        }
+        
+        // Add file to FormData
+        formData.append('file', file);
+        
+        // Get course value (use custom input if "other" is selected)
+        const courseValue = courseSelect.value === 'other' 
+            ? courseCustomInput.value.trim() 
+            : courseSelect.value;
+        
+        // Add form fields to FormData
+        formData.append('university', universitySelect.value);
+        formData.append('faculty', facultySelect.value);
+        formData.append('course', courseValue);
+        formData.append('documentTitle', document.getElementById('title').value);
+        formData.append('description', document.getElementById('description').value);
+        formData.append('documentType', document.getElementById('documentType').value);
+        formData.append('tags', document.getElementById('tags').value || '');
+        
+        // Show loading state
+        const submitBtn = uploadForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        
+        // Update progress bar
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        try {
+            // Send data to server
+            const response = await fetch('/uploadfile/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                // Success
+                alert('Document uploaded successfully! Our AI is now processing it for keywords and duplicate detection.');
+                // Reset form
+                uploadForm.reset();
+                filePreview.style.display = 'none';
+                document.querySelector('.dropzone-content').style.display = 'block';
+                progressFill.style.width = '0%';
+                progressText.textContent = '0%';
+                
+                // Redirect to profile page
+                window.location.href = 'profile.html';
+            } else {
+                // Error
+                alert(`Upload failed: ${result.detail || 'Unknown error'}`);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Upload failed: ' + error.message);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
     });
 }

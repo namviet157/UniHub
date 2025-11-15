@@ -1,5 +1,35 @@
 const registerForm = document.getElementById('registerForm');
 
+async function loadUniversities() {
+    const universitySelect = document.getElementById('university');
+    if (!universitySelect) return;
+    
+    try {
+        universitySelect.innerHTML = '<option value="">Loading universities...</option>';
+        
+        const response = await fetch('./data/universities.json');
+        if (!response.ok) {
+            throw new Error('Failed to load universities');
+        }
+        
+        const data = await response.json();
+        universitySelect.innerHTML = '<option value="">Select your university</option>';
+        
+        data.universities.forEach(uni => {
+            const option = document.createElement('option');
+            option.value = uni.id;
+            option.textContent = uni.name;
+            universitySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading universities:', error);
+        universitySelect.innerHTML = '<option value="">Error loading universities</option>';
+    }
+}
+
+// Load universities when page loads
+document.addEventListener('DOMContentLoaded', loadUniversities);
+
 if (registerForm) {
     registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -46,11 +76,20 @@ if (registerForm) {
                 })
             });
             
-            const data = await response.json();
-            
+            // Check if response is ok before parsing JSON
             if (!response.ok) {
-                throw new Error(data.detail || 'Registration failed');
+                let errorMessage = 'Registration failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorMessage;
+                } catch (e) {
+                    // If response is not JSON, use status text
+                    errorMessage = `Error ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
+            
+            const data = await response.json();
             
             // Save token
             saveToken(data.access_token);
@@ -65,7 +104,19 @@ if (registerForm) {
             
         } catch (error) {
             console.error('Registration error:', error);
-            showNotification(error.message || 'Registration failed. Please try again.', 'error');
+            
+            // Handle different types of errors
+            let errorMessage = 'Registration failed. Please try again.';
+            
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Cannot connect to server. Please make sure the backend is running on ' + API_BASE_URL;
+            } else if (error.name === 'NetworkError' || error.message === 'Failed to fetch') {
+                errorMessage = 'Network error. Please check your connection and make sure the backend server is running.';
+            }
+            
+            showNotification(errorMessage, 'error');
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         }

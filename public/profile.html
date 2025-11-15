@@ -22,7 +22,7 @@
                     <a href="upload.html" class="nav-link">Upload</a>
                     <a href="profile.html" class="nav-link active">Profile</a>
                 </nav>
-                <a href="login.html" class="btn btn-primary">Login</a>
+                <a href="login.html" class="btn btn-primary">Log out</a>
             </div>
         </div>
     </header>
@@ -31,16 +31,16 @@
         <div class="container">
             <div class="profile-header">
                 <div class="profile-avatar">
-                    <img src="https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200" alt="User Avatar">
+                    <img src="./data/avatar.png" alt="User Avatar" onerror="this.onerror=null;this.src='./data/default-avatar.png';">
                     <button class="avatar-edit">
                         <i class="fas fa-camera"></i>
                     </button>
                 </div>
                 <div class="profile-info">
-                    <h1>John Smith</h1>
+                    <h1 id="userFullname">Loading...</h1>
                     <p class="profile-subtitle">
                         <i class="fas fa-university"></i>
-                        Massachusetts Institute of Technology
+                        <span id="userUniversity">Loading...</span>
                     </p>
                     <p class="profile-subtitle">
                         <i class="fas fa-graduation-cap"></i>
@@ -374,6 +374,8 @@
     </div>
 
     <script src="./js/script.js"></script>
+    <script src="./js/auth.js"></script>
+    <script src="./js/profile.js"></script>
     <script>
         function switchTab(event, tabName) {
             const tabContents = document.querySelectorAll('.tab-content');

@@ -1,8 +1,10 @@
 fastapi
 uvicorn
-motor
-pymongo
+aioodbc
+pyodbc
 pydantic
-passlib
+passlib[bcrypt]
+bcrypt==4.0.1
 python-jose
 python-multipart
+email-validator

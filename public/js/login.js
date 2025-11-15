@@ -31,11 +31,20 @@ if (loginForm) {
                 })
             });
             
-            const data = await response.json();
-            
+            // Check if response is ok before parsing JSON
             if (!response.ok) {
-                throw new Error(data.detail || 'Login failed');
+                let errorMessage = 'Login failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorMessage;
+                } catch (e) {
+                    // If response is not JSON, use status text
+                    errorMessage = `Error ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
+            
+            const data = await response.json();
             
             // Save token
             saveToken(data.access_token);
@@ -50,7 +59,19 @@ if (loginForm) {
             
         } catch (error) {
             console.error('Login error:', error);
-            showNotification(error.message || 'Login failed. Please check your credentials.', 'error');
+            
+            // Handle different types of errors
+            let errorMessage = 'Login failed. Please check your credentials.';
+            
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Cannot connect to server. Please make sure the backend is running on ' + API_BASE_URL;
+            } else if (error.name === 'NetworkError' || error.message === 'Failed to fetch') {
+                errorMessage = 'Network error. Please check your connection and make sure the backend server is running.';
+            }
+            
+            showNotification(errorMessage, 'error');
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         }

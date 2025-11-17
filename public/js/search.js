@@ -1,4 +1,3 @@
-// Search functionality for search.html
 let allDocuments = [];
 let filteredDocuments = [];
 
@@ -7,15 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const sortSelect = document.getElementById('sortSelect');
     
-    // Load all documents on page load
     loadAllDocuments();
     
-    // Search on button click
     if (searchBtn) {
         searchBtn.addEventListener('click', performSearch);
     }
     
-    // Search on Enter key
     if (searchInput) {
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -24,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Sort when sort option changes
     if (sortSelect) {
         sortSelect.addEventListener('change', () => {
             if (filteredDocuments.length > 0) {
@@ -43,7 +38,6 @@ async function loadAllDocuments() {
         }
         
         allDocuments = await response.json();
-        // Initially show all documents
         filteredDocuments = [...allDocuments];
         displayDocuments(filteredDocuments);
     } catch (error) {
@@ -65,10 +59,8 @@ function performSearch() {
     const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
     
     if (!searchTerm) {
-        // If no search term, show all documents
         filteredDocuments = [...allDocuments];
     } else {
-        // Filter documents based on search term
         filteredDocuments = allDocuments.filter(doc => {
             const title = (doc.documentTitle || doc.filename || '').toLowerCase();
             const description = (doc.description || '').toLowerCase();
@@ -92,7 +84,6 @@ function performSearch() {
         });
     }
     
-    // Sort and display
     sortDocuments();
     displayDocuments(filteredDocuments);
 }
@@ -106,19 +97,18 @@ function sortDocuments() {
             filteredDocuments.sort((a, b) => {
                 const dateA = new Date(a.uploaded_at || 0);
                 const dateB = new Date(b.uploaded_at || 0);
-                return dateB - dateA; // Newest first
+                return dateB - dateA;
             });
             break;
         case 'popular':
             filteredDocuments.sort((a, b) => {
                 const scoreA = (a.vote_count || 0) * 2 + (a.comment_count || 0);
                 const scoreB = (b.vote_count || 0) * 2 + (b.comment_count || 0);
-                return scoreB - scoreA; // Highest score first
+                return scoreB - scoreA;
             });
             break;
         case 'relevance':
         default:
-            // Already sorted by priority_score from API
             break;
     }
 }
@@ -129,7 +119,6 @@ function displayDocuments(documents) {
     
     if (!resultsList) return;
     
-    // Update count
     if (resultsCount) {
         resultsCount.textContent = `(${documents.length} document${documents.length !== 1 ? 's' : ''} found)`;
     }
@@ -148,7 +137,6 @@ function displayDocuments(documents) {
         return;
     }
     
-    // Clear and display documents
     resultsList.innerHTML = '';
     
     documents.forEach(doc => {
@@ -163,7 +151,6 @@ function createDocumentCard(doc) {
     const title = escapeHtml(doc.documentTitle || doc.filename);
     const description = escapeHtml(doc.description || 'No description available');
     
-    // Build tags
     let tagsHTML = '';
     if (doc.university) {
         tagsHTML += `<span class="tag">${escapeHtml(doc.university)}</span>`;

@@ -1,12 +1,28 @@
 fastapi
 uvicorn
+beanie
+motor
 aioodbc
 pyodbc
 pydantic
-passlib[bcrypt]
-bcrypt==4.0.1
-python-jose
 python-multipart
 email-validator
-motor
-beanie
+passlib[bcrypt]
+bcrypt==4.0.1
+python-jose[cryptography]
+
+# AI & NLP stack
+torch
+transformers
+sentence-transformers
+keybert
+scikit-learn
+numpy
+nltk
+deep-translator
+googletrans==4.0.0rc1
+
+# PDF processing
+PyMuPDF
+PyPDF2
+pdfplumber

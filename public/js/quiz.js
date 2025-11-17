@@ -1,16 +1,13 @@
-// Quiz Generation Handler
 let selectedFile = null;
 let selectedDocumentId = null;
 let generatedQuiz = null;
-let processedData = null; // Store complete processed data (summary, keywords, quiz)
+let processedData = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Check authentication
     if (typeof checkAuth === 'function') {
         checkAuth();
     }
 
-    // File input handler
     const fileInput = document.getElementById('fileInput');
     const selectFromDocuments = document.getElementById('selectFromDocuments');
     const clearSelection = document.getElementById('clearSelection');
@@ -18,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadQuizBtn = document.getElementById('downloadQuizBtn');
     const startQuizBtn = document.getElementById('startQuizBtn');
 
-    // Upload new file
     if (fileInput) {
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -34,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Select from documents
     if (selectFromDocuments) {
         selectFromDocuments.addEventListener('click', async () => {
             await loadDocuments();
@@ -42,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clear selection
     if (clearSelection) {
         clearSelection.addEventListener('click', () => {
             selectedFile = null;
@@ -53,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Generate quiz
     if (generateQuizBtn) {
         generateQuizBtn.addEventListener('click', async () => {
             const numQuestions = parseInt(document.getElementById('numQuestions').value) || 10;
@@ -61,14 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Download quiz
     if (downloadQuizBtn) {
         downloadQuizBtn.addEventListener('click', () => {
             downloadQuizJSON();
         });
     }
 
-    // Start quiz
     if (startQuizBtn) {
         startQuizBtn.addEventListener('click', () => {
             startQuiz();
@@ -115,7 +106,6 @@ async function loadDocuments() {
 
         documentList.innerHTML = html;
 
-        // Attach click handlers
         document.querySelectorAll('.select-doc-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const docItem = this.closest('.document-item');
@@ -162,19 +152,16 @@ function hideQuizSettings() {
 }
 
 async function generateQuiz(numQuestions) {
-    // Show loading
     document.getElementById('fileSelectionSection').style.display = 'none';
     document.getElementById('loadingSection').style.display = 'block';
     document.getElementById('quizResultsSection').style.display = 'none';
     
-    // Update loading message
     const loadingMessage = document.getElementById('loadingMessage');
     if (loadingMessage) {
         loadingMessage.textContent = 'Processing PDF: Extracting text, generating summary, extracting keywords, and creating quiz questions. This may take a few moments...';
     }
 
     try {
-        // Check if getToken function exists
         if (typeof getToken !== 'function') {
             console.error('getToken function not found. Make sure auth.js is loaded.');
             alert('Authentication error. Please refresh the page and log in again.');
@@ -189,22 +176,15 @@ async function generateQuiz(numQuestions) {
             return;
         }
 
-        // Debug: Log token (first 20 chars only for security)
-        console.log('Token exists:', token ? `${token.substring(0, 20)}...` : 'null');
-        console.log('Selected document ID:', selectedDocumentId);
-        console.log('Selected file:', selectedFile ? selectedFile.name : 'null');
-
         let response;
         
         if (selectedFile) {
-            // Upload new file - use complete processing endpoint
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('num_questions', numQuestions);
             formData.append('include_summary', 'true');
             formData.append('include_keywords', 'true');
             
-            console.log('Calling API: /api/generate-quiz-from-file-complete');
             response = await fetch('/api/generate-quiz-from-file-complete', {
                 method: 'POST',
                 headers: {
@@ -213,15 +193,11 @@ async function generateQuiz(numQuestions) {
                 body: formData
             });
         } else if (selectedDocumentId) {
-            // Use existing document - use complete processing endpoint
             const requestBody = {
                 num_questions: numQuestions,
                 include_summary: true,
                 include_keywords: true
             };
-            
-            console.log('Calling API:', `/api/documents/${selectedDocumentId}/process-pdf`);
-            console.log('Request body:', requestBody);
             
             response = await fetch(`/api/documents/${selectedDocumentId}/process-pdf`, {
                 method: 'POST',
@@ -235,10 +211,7 @@ async function generateQuiz(numQuestions) {
             throw new Error('Please select a file or document');
         }
 
-        console.log('Response status:', response.status, response.statusText);
-
         if (!response.ok) {
-            // Handle 401 Unauthorized specifically
             if (response.status === 401) {
                 alert('Your session has expired. Please log in again.');
                 if (typeof removeToken === 'function') {
@@ -259,16 +232,13 @@ async function generateQuiz(numQuestions) {
         }
 
         processedData = await response.json();
-        generatedQuiz = processedData.quiz; // Keep for backward compatibility
-
-        // Display all results (summary, keywords, quiz)
+        generatedQuiz = processedData.quiz;
         displayAllResults(processedData);
 
     } catch (error) {
         console.error('Error processing PDF:', error);
         alert('Failed to process PDF: ' + error.message);
         
-        // Show file selection again
         document.getElementById('fileSelectionSection').style.display = 'block';
         document.getElementById('loadingSection').style.display = 'none';
     }
@@ -278,13 +248,11 @@ function displayAllResults(data) {
     document.getElementById('loadingSection').style.display = 'none';
     document.getElementById('quizResultsSection').style.display = 'block';
 
-    // Display Summary
     if (data.summary) {
         const summarySection = document.getElementById('summarySection');
         const summaryContent = document.getElementById('summaryContent');
         if (summarySection && summaryContent) {
             summarySection.style.display = 'block';
-            // Format summary text (preserve line breaks)
             const escapedSummary = escapeHtml(data.summary);
             const formattedSummary = escapedSummary.replace(/\n/g, '<br>');
             summaryContent.innerHTML = `<div class="summary-text">${formattedSummary}</div>`;
@@ -293,7 +261,6 @@ function displayAllResults(data) {
         document.getElementById('summarySection').style.display = 'none';
     }
 
-    // Display Keywords
     if (data.keywords && data.keywords.length > 0) {
         const keywordsSection = document.getElementById('keywordsSection');
         const keywordsContent = document.getElementById('keywordsContent');
@@ -310,7 +277,6 @@ function displayAllResults(data) {
         document.getElementById('keywordsSection').style.display = 'none';
     }
 
-    // Display Quiz
     if (data.quiz) {
         displayQuizResults(data.quiz);
         document.getElementById('quizPreviewSection').style.display = 'block';
@@ -381,14 +347,11 @@ function downloadQuizJSON() {
 function startQuiz() {
     if (!generatedQuiz) return;
     
-    // Store quiz in sessionStorage
     sessionStorage.setItem('currentQuiz', JSON.stringify(generatedQuiz));
     
-    // Initialize quiz taking
     initializeQuizTaking(generatedQuiz);
 }
 
-// Quiz taking state
 let quizState = {
     currentQuestionIndex: 0,
     answers: {},
@@ -397,7 +360,6 @@ let quizState = {
 };
 
 function initializeQuizTaking(quizData) {
-    // Reset quiz state
     quizState = {
         currentQuestionIndex: 0,
         answers: {},
@@ -405,22 +367,18 @@ function initializeQuizTaking(quizData) {
         quizData: quizData
     };
     
-    // Set quiz title
     const quizModalTitle = document.getElementById('quizModalTitle');
     if (quizModalTitle) {
         quizModalTitle.innerHTML = `<i class="fas fa-question-circle"></i> ${escapeHtml(quizData.quiz_title || 'Quiz')}`;
     }
     
-    // Show modal
     const quizModal = document.getElementById('quizTakingModal');
     if (quizModal) {
         quizModal.classList.add('active');
     }
     
-    // Load first question
     loadQuestion(0);
     
-    // Update navigation buttons
     updateQuizNavigation();
 }
 
@@ -434,10 +392,8 @@ function loadQuestion(questionIndex) {
     const container = document.getElementById('quizQuestionContainer');
     if (!container) return;
     
-    // Update progress
     updateProgress(questionIndex + 1, questions.length);
     
-    // Build question HTML
     let html = `
         <div class="quiz-question">
             <div class="question-header">
@@ -447,7 +403,6 @@ function loadQuestion(questionIndex) {
             <div class="question-options-list">
     `;
     
-    // Add options
     if (question.options) {
         Object.entries(question.options).forEach(([key, value]) => {
             const isSelected = quizState.answers[question.id] === key;
@@ -468,27 +423,22 @@ function loadQuestion(questionIndex) {
     
     container.innerHTML = html;
     
-    // Attach event listeners to radio buttons
     container.querySelectorAll('input[type="radio"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const questionId = question.id;
             const selectedOption = this.value;
             
-            // Save answer
             quizState.answers[questionId] = selectedOption;
             
-            // Update UI
             container.querySelectorAll('.option-radio').forEach(opt => {
                 opt.classList.remove('selected');
             });
             this.closest('.option-radio').classList.add('selected');
             
-            // Update navigation
             updateQuizNavigation();
         });
     });
     
-    // Update navigation buttons
     updateQuizNavigation();
 }
 
@@ -515,24 +465,19 @@ function updateQuizNavigation() {
     const nextBtn = document.getElementById('nextQuestionBtn');
     const submitBtn = document.getElementById('submitQuizBtn');
     
-    // Previous button
     if (prevBtn) {
         prevBtn.disabled = currentIndex === 0;
     }
     
-    // Next/Submit button
     if (currentIndex === totalQuestions - 1) {
-        // Last question - show submit button
         if (nextBtn) nextBtn.style.display = 'none';
         if (submitBtn) submitBtn.style.display = 'inline-flex';
     } else {
-        // Not last question - show next button
         if (nextBtn) nextBtn.style.display = 'inline-flex';
         if (submitBtn) submitBtn.style.display = 'none';
     }
 }
 
-// Attach quiz navigation handlers
 document.addEventListener('DOMContentLoaded', () => {
     const prevBtn = document.getElementById('prevQuestionBtn');
     const nextBtn = document.getElementById('nextQuestionBtn');
@@ -591,7 +536,6 @@ function submitQuiz() {
     let correctCount = 0;
     let totalQuestions = questions.length;
     
-    // Calculate results
     const results = questions.map(question => {
         const userAnswer = quizState.answers[question.id];
         const isCorrect = userAnswer === question.correct_answer;
@@ -611,12 +555,10 @@ function submitQuiz() {
     });
     
     const score = Math.round((correctCount / totalQuestions) * 100);
-    const timeSpent = Math.round((Date.now() - quizState.startTime) / 1000); // seconds
+    const timeSpent = Math.round((Date.now() - quizState.startTime) / 1000);
     
-    // Close quiz modal
     closeQuizModalFunc();
     
-    // Show results
     showQuizResults({
         score: score,
         correctCount: correctCount,
@@ -627,15 +569,9 @@ function submitQuiz() {
     });
 }
 
-// Sửa hàm showQuizResults trong quiz.js
 function showQuizResults(resultData) {
-    console.log('showQuizResults called with:', resultData); // Debug
-    
     const resultsModal = document.getElementById('quizResultsModal');
     const resultsContent = document.getElementById('quizResultsContent');
-    
-    console.log('resultsModal:', resultsModal); // Debug
-    console.log('resultsContent:', resultsContent); // Debug
     
     if (!resultsModal) {
         console.error('quizResultsModal not found!');
@@ -649,7 +585,6 @@ function showQuizResults(resultData) {
         return;
     }
     
-    // Build results HTML
     let html = `
         <div class="quiz-score-summary">
             <div class="score-circle">
@@ -714,15 +649,11 @@ function showQuizResults(resultData) {
     
     resultsContent.innerHTML = html;
     
-    // Show modal - Đảm bảo modal được hiển thị
-    console.log('Adding active class to modal'); // Debug
     resultsModal.classList.add('active');
-    resultsModal.style.display = 'flex'; // Force display
+    resultsModal.style.display = 'flex';
     
-    // Scroll to top of modal
     resultsModal.scrollTop = 0;
     
-    // Attach close handlers
     const closeResultsBtn = document.getElementById('closeResultsBtn');
     const closeResultsModal = document.getElementById('closeResultsModal');
     const retakeBtn = document.getElementById('retakeQuizBtn');
@@ -743,8 +674,6 @@ function showQuizResults(resultData) {
             }
         };
     }
-    
-    console.log('Modal should be visible now'); // Debug
 }
 
 function closeQuizModalFunc() {

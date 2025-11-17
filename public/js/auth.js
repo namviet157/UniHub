@@ -1,7 +1,5 @@
-// API base URL - change this to your FastAPI server URL
 const API_BASE_URL = 'http://localhost:8000';
 
-// Helper function to show notifications
 function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -27,34 +25,28 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-// Save token to localStorage
 function saveToken(token) {
     localStorage.setItem('access_token', token);
 }
 
-// Get token from localStorage
 function getToken() {
     return localStorage.getItem('access_token');
 }
 
-// Remove token from localStorage
 function removeToken() {
     localStorage.removeItem('access_token');
 }
 
-// Check if user is authenticated
 function isAuthenticated() {
     return getToken() !== null;
 }
 
-// Redirect to login if not authenticated
 function requireAuth() {
     if (!isAuthenticated()) {
         window.location.href = 'login.html';
     }
 }
 
-// Get headers with authorization
 function getAuthHeaders() {
     const token = getToken();
     return {

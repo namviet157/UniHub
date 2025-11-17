@@ -1,10 +1,8 @@
-// Load and display documents for Personalized AI Recommendations
 async function loadRecommendations() {
     const grid = document.getElementById('recommendationsGrid');
     if (!grid) return;
     
     try {
-        // Fetch documents from API (limit to top 6 for recommendations)
         const response = await fetch('/documents/');
         
         if (!response.ok) {
@@ -13,7 +11,6 @@ async function loadRecommendations() {
         
         const documents = await response.json();
         
-        // Take top 6 documents (already sorted by priority_score)
         const recommendations = documents.slice(0, 6);
         
         if (recommendations.length === 0) {
@@ -28,10 +25,8 @@ async function loadRecommendations() {
             return;
         }
         
-        // Clear loading text
         grid.innerHTML = '';
         
-        // Display documents
         recommendations.forEach(doc => {
             const card = createDocumentCard(doc);
             grid.insertAdjacentHTML('beforeend', card);
@@ -54,7 +49,6 @@ function createDocumentCard(doc) {
     const title = escapeHtml(doc.documentTitle || doc.filename);
     const description = escapeHtml(doc.description || 'No description available');
     
-    // Build tags
     let tagsHTML = '';
     if (doc.university) {
         tagsHTML += `<span class="tag">${escapeHtml(doc.university)}</span>`;
@@ -128,7 +122,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Load recommendations when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadRecommendations();
 });

@@ -13,36 +13,25 @@ function toggleTree(element) {
   }
 }
 
-/**
- * Chờ cho toàn bộ trang web được tải xong
- */
 document.addEventListener("DOMContentLoaded", () => {
-  // Tìm container chứa danh sách document
   const documentListContainer = document.getElementById("document-list");
 
   if (documentListContainer) {
-    // Nếu tìm thấy (tức là đang ở trang explore.html),
-    // gọi hàm để lấy và hiển thị tài liệu
     fetchAndDisplayDocuments();
   }
 });
 
-/**
- * Hàm này gọi API /documents/ và hiển thị kết quả ra HTML
- */
 async function fetchAndDisplayDocuments() {
   const container = document.getElementById("document-list");
 
   try {
-    // 1. Gọi API endpoint (GET /documents/)
     const response = await fetch("/documents/");
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // 2. Chuyển đổi dữ liệu trả về thành mảng JSON
-    const documents = await response.json(); // Đây là MẢNG các object
+    const documents = await response.json();
 
     if (documents.length === 0) {
       container.innerHTML =
@@ -50,26 +39,9 @@ async function fetchAndDisplayDocuments() {
       return;
     }
 
-    // Debug: Log first document to check vote_count and comment_count
-    if (documents.length > 0) {
-      console.log("Sample document from API:", {
-        id: documents[0].id,
-        vote_count: documents[0].vote_count,
-        comment_count: documents[0].comment_count,
-        has_voted: documents[0].has_voted
-      });
-    }
-
-    // Xóa thông báo "Đang tải..."
     container.innerHTML = "";
 
-    // 3. DÙNG VÒNG LẶP ĐỂ TRUY CẬP TỪNG OBJECT
     documents.forEach((doc) => {
-      // 'doc' chính là TỪNG OBJECT (tài liệu) của bạn
-
-      // =============================================
-      // === TẠO HTML CHO CARD LỚN (ĐÃ CẬP NHẬT) ===
-      // =============================================
       const documentCardHTML = `
             <div class="document-card-large">
                 <div class="document-icon-large">
@@ -121,19 +93,14 @@ async function fetchAndDisplayDocuments() {
             </div>
             `;
 
-      // Thêm HTML vừa tạo vào trong container
       container.insertAdjacentHTML("beforeend", documentCardHTML);
       
-      // Load vote status and comment count for this document
       const docId = doc.id || doc._id || '';
       if (docId) {
-        // Vote count is already loaded from API, just check user vote status
         checkUserVoteStatus(docId);
-        // Comment count is already loaded from API
       }
     });
     
-    // Attach event listeners to comment and vote buttons
     attachCommentButtonListeners();
     attachVoteButtonListeners();
     attachPreviewButtonListeners();

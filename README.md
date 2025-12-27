@@ -22,7 +22,7 @@ UniHub is a full-stack reference platform that lets students upload academic doc
 ### Local Setup
 1. **Clone & virtual env**
    ```bash
-   git clone https://github.com/<your-org>/UniHub.git
+   git clone https://github.com/namviet157/UniHub.git
    cd UniHub
    python -m venv venv
    venv\Scripts\activate  # Windows

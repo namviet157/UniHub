@@ -1,18 +1,18 @@
-# ...existing code...
 import fitz
-from transformers import T5Tokenizer, T5ForConditionalGeneration
-import nltk
-from nltk.tokenize import sent_tokenize
-import torch
 import re
 import os
 import time
+import torch
+import nltk
+from nltk.tokenize import sent_tokenize
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 from deep_translator import GoogleTranslator
+
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
 def translate_text(text, src="en", dest="vi"):
     return GoogleTranslator(source=src, target=dest).translate(text)
-
-nltk.download('punkt', quiet=True)
 
 class ExtendedLectureSummarizer:
     def __init__(self):
@@ -88,46 +88,29 @@ This document covers essential concepts with practical applications in multiple 
 
     @staticmethod
     def split_text_into_chunks(text, max_chunk_size=4000):
-        """
-        Chia văn bản thành các phần nhỏ để phù hợp với giới hạn của Google Translate
-        """
         chunks = []
         paragraphs = text.split('\n')
         current_chunk = ""
-
         for paragraph in paragraphs:
             if len(current_chunk) + len(paragraph) > max_chunk_size:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
                     current_chunk = ""
             current_chunk += paragraph + "\n"
-
         if current_chunk:
             chunks.append(current_chunk.strip())
-
         return chunks
 
     def translate_vietnamese_to_english(self, text):
-        """
-        Dịch văn bản tiếng Việt sang tiếng Anh sử dụng googletrans với chia chunk để tránh giới hạn
-        """
         try:
-            translator = Translator()
             chunks = self.split_text_into_chunks(text)
             translated_chunks = []
-
-            for i, chunk in enumerate(chunks):
-                # in log để debug nếu cần
-                print(f"🔄 Translating chunk {i+1}/{len(chunks)}...")
-                translated = translate_text(text, src="en", dest="vi")
-                translated_chunks.append(translated.text)
-                time.sleep(1)  # tránh bị block / rate-limit
-
-            full_translation = " ".join(translated_chunks)
-            print("✅ Translation finished")
-            return full_translation
-        except Exception as e:
-            print(f"❌ Translation error: {e}")
+            for chunk in chunks:
+                translated = translate_text(chunk, src="vi", dest="en")
+                translated_chunks.append(translated)
+                time.sleep(1)
+            return " ".join(translated_chunks)
+        except Exception:
             return None
 
     def process(self, file_path):
@@ -151,12 +134,7 @@ This document covers essential concepts with practical applications in multiple 
         output_file = f"summaries/{base}_summary_EN.txt"
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(data['english'])
-        print(f"Saved (English only): {output_file}")
 
     def get_summary_text(self, file_path):
-        """Trả về text summary mà không cần lưu file"""
         result = self.process(file_path)
-        if result:
-            return result['english']
-        return None
-# ...existing code...
+        return result['english'] if result else None

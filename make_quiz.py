@@ -1,32 +1,22 @@
 import re
 import random
 import json
-import numpy as np
 from typing import List, Dict, Any
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from sentence_transformers import SentenceTransformer, util
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+from sentence_transformers import SentenceTransformer
 
 class AdvancedEnglishQuizGenerator:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"🚀 Using device: {self.device}")
-        
-        # Improved models
-        print("🔄 Loading improved models...")
         self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
-        
-        # Better question generation model
         self.qg_tokenizer = AutoTokenizer.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap")
         self.qg_model = AutoModelForSeq2SeqLM.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap").to(self.device)
-        
         self.qa_pipeline = pipeline(
             "question-answering",
             model="deepset/roberta-base-squad2",
             device=0 if self.device == "cuda" else -1
         )
-        
-        # Enhanced question templates
         self.question_templates = {
             "definition": [
                 "What is the primary definition of {concept}?",
@@ -198,35 +188,15 @@ class AdvancedEnglishQuizGenerator:
         return None
 
     def _generate_from_model(self, context: str, concept: str) -> str:
-        """Generate question using AI model"""
         try:
             input_text = f"generate question: {context}"
-            
-            inputs = self.qg_tokenizer(
-                input_text, 
-                return_tensors="pt", 
-                max_length=512, 
-                truncation=True
-            ).to(self.device)
-            
-            outputs = self.qg_model.generate(
-                inputs.input_ids,
-                max_length=64,
-                num_beams=4,
-                early_stopping=True,
-                temperature=0.8
-            )
-            
+            inputs = self.qg_tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True).to(self.device)
+            outputs = self.qg_model.generate(inputs.input_ids, max_length=64, num_beams=4, early_stopping=True, temperature=0.8)
             question = self.qg_tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # Ensure question is about the concept
             if concept.lower() not in question.lower():
                 question = f"What is {concept} in data mining?"
-                
             return question
-            
-        except Exception as e:
-            print(f"Model generation error: {e}")
+        except Exception:
             return None
 
     def _generate_from_keypoints(self, key_points: List[str], concept: str) -> str:
@@ -386,11 +356,7 @@ class AdvancedEnglishQuizGenerator:
         return random.sample(distractors, 3)
 
     def generate_complete_quiz(self, english_text: str, num_questions: int = 15) -> Dict[str, Any]:
-        """Generate complete improved quiz"""
-        print("🔨 Processing text with advanced extraction...")
-        
         concepts_data = self.extract_key_concepts_with_context(english_text)
-        print(f"📚 Found {len(concepts_data)} concept groups")
         
         quiz_questions = []
         used_combinations = set()
@@ -452,103 +418,28 @@ class AdvancedEnglishQuizGenerator:
             "concepts_covered": list(set([q["concept"] for q in quiz_questions]))
         }
 
-    def display_quiz(self, quiz_data: Dict[str, Any]):
-        """Display the generated quiz"""
-        if "error" in quiz_data:
-            print(f"❌ {quiz_data['error']}")
-            return
-            
-        print("\n" + "="*80)
-        print(f"📝 {quiz_data['quiz_title']}")
-        print(f"📊 Total Questions: {quiz_data['total_questions']}")
-        print(f"🎯 Concepts: {', '.join(quiz_data['concepts_covered'])}")
-        print("="*80)
-        
-        for question in quiz_data["questions"]:
-            print(f"\n{question['id']}. {question['question']}")
-            print(f"   Type: {question['type'].title()} | Concept: {question['concept']}")
-            
-            for opt, text in question["options"].items():
-                print(f"   {opt}. {text}")
-            
-            print(f"   ✅ Correct: {question['correct_answer']}")
-            print(f"   💡 Explanation: {question['explanation']}")
-            print("-" * 80)
-
-    def save_quiz_to_file(self, quiz_data: Dict, output_path: str = "rag_quiz_upgraded_en.json"): # Sửa tên file
-            """
-            NÂNG CẤP: Lưu quiz ra file JSON với định dạng đơn giản
-            (chỉ câu hỏi, các lựa chọn, và văn bản câu trả lời đúng).
-            """
-            
-            # NÂNG CẤP: Tạo một cấu trúc dữ liệu đơn giản hơn
-            simplified_quiz = {
-                "quiz_title": quiz_data.get("quiz_title", "Advanced English Quiz"),
-                "total_questions": quiz_data.get("total_questions", 0),
-                "questions": []
-            }
-            
-            original_questions = quiz_data.get("questions", [])
-            if not isinstance(original_questions, list):
-                print(f"❌ Lỗi: Cấu trúc 'questions' không phải là danh sách.")
-                original_questions = []
-
-            for q in original_questions:
-                try:
-                    correct_label = q.get("correct_answer") # vd: "A"
-                    
-                    # Lấy văn bản của câu trả lời đúng từ "options"
-                    correct_text = q.get("options", {}).get(correct_label, "LỖI: Không tìm thấy text")
-                    
-                    simple_q = {
-                        "question": q.get("question"),
-                        "options": q.get("options"),
-                        "correct_answer": correct_text # Đây là văn bản của câu trả lời đúng
-                    }
-                    simplified_quiz["questions"].append(simple_q)
-                except Exception as e:
-                    print(f"⚠️ Lỗi khi đơn giản hóa câu hỏi {q.get('id')}: {e}")
-
-            # Lưu cấu trúc đã đơn giản hóa
+    def save_quiz_to_file(self, quiz_data: Dict, output_path: str = "rag_quiz_upgraded_en.json"):
+        simplified_quiz = {
+            "quiz_title": quiz_data.get("quiz_title", "Advanced English Quiz"),
+            "total_questions": quiz_data.get("total_questions", 0),
+            "questions": []
+        }
+        original_questions = quiz_data.get("questions", [])
+        if not isinstance(original_questions, list):
+            original_questions = []
+        for q in original_questions:
             try:
-                with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump(simplified_quiz, f, ensure_ascii=False, indent=2)
-                print(f"💾 Đã lưu quiz (đã đơn giản hóa) vào: {output_path}")
-            except Exception as e:
-                print(f"❌ Lỗi khi lưu file: {e}")
-                if "not JSON serializable" in str(e):
-                    print("--- Dữ liệu lỗi (Thử in một phần) ---")
-                    # Cố gắng in ra một phần an toàn của dữ liệu
-                    safe_data = {"title": simplified_quiz.get("quiz_title"), "total": simplified_quiz.get("total_questions")}
-                    print(json.dumps(safe_data, indent=2))
-
-# Example usage
-def main():
-    english_content = """
-    Data Mining is important because it helps discover hidden patterns in big data, 
-    support smart business decision making, and optimize operational processes.
-    Data Mining is the process of discovering knowledge from data through statistical techniques, 
-    machine learning, and artificial intelligence to find meaningful patterns, trends, and relationships.
-    The Explosive Growth of Data: from terabytes to petabytes. Automated data collection tools, 
-    database systems, the Web, computerized society. We are drowning in data, but starving for knowledge!
-    Data mining includes techniques such as classification, clustering, association rule discovery, 
-    and prediction. Applications in many fields from marketing, healthcare, to finance and security.
-    KDD Process: Data Cleaning, Data Integration, Data Selection, Data Mining, Pattern Evaluation.
-    Challenges include tremendous amount of data, algorithms must be highly scalable, 
-    high-dimensionality of data, and high complexity of data.
-    Business Intelligence uses data mining to support business decisions through data analysis.
-    """
-    
-    print("🚀 Initializing Advanced English Quiz Generator...")
-    generator = AdvancedEnglishQuizGenerator()
-    
-    quiz_data = generator.generate_complete_quiz(
-        english_text=english_content,
-        num_questions=12
-    )
-    
-    generator.display_quiz(quiz_data)
-    generator.save_quiz_to_file(quiz_data)
-
-if __name__ == "__main__":
-    main()
+                correct_label = q.get("correct_answer")
+                correct_text = q.get("options", {}).get(correct_label, "")
+                simplified_quiz["questions"].append({
+                    "question": q.get("question"),
+                    "options": q.get("options"),
+                    "correct_answer": correct_text
+                })
+            except Exception:
+                pass
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(simplified_quiz, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass

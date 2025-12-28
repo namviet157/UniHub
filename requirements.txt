@@ -20,7 +20,6 @@ scikit-learn
 numpy
 nltk
 deep-translator
-googletrans==4.0.0rc1
 
 # PDF processing
 PyMuPDF
